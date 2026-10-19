@@ -105,6 +105,21 @@ export interface RunSummary {
   running: boolean
 }
 
+export interface RunOutput {
+  index: number
+  node: string
+  parameter: string
+  file: string
+  name: string
+  size: number | null
+  written: boolean
+}
+
+export interface DownloadLink {
+  url: string
+  rows?: number
+}
+
 export interface LogRecord {
   seq: number
   time: string

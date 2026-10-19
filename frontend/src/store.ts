@@ -20,6 +20,7 @@ export const store = reactive({
   connected: false,
   authorised: true,
   fileDialog: null as FileDialog | null,
+  showOutputs: false,
 })
 
 export function selectedNode() {

@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import uuid as uuid_mod
 from collections.abc import Iterator
 from typing import Any, Optional
@@ -59,8 +60,11 @@ class RunState:
     id: str
     config: str
     started: str
+    started_at: float
     process: subprocess.Popen
     lines: collections.deque
+    # The files the pipeline's save nodes were set to write when the run started.
+    outputs: list[dict[str, str]] = dataclasses.field(default_factory=list)
     finished: Optional[str] = None
     returncode: Optional[int] = None
 
@@ -404,6 +408,13 @@ class Session:
             for node in self.graph.nodes:
                 if node.plugin:
                     node.load_config()
+            outputs = [
+                {"node": node.name, "parameter": path, "file": file}
+                for node in self.graph.nodes
+                if node.plugin
+                for path, file in params.output_files(node.plugin)
+            ]
+            started_at = time.time()
             write_config(self.graph, str(snapshot))
             process = subprocess.Popen(  # pylint: disable=consider-using-with
                 [sys.executable, "-m", "countess_web.runner", str(snapshot)],
@@ -417,8 +428,10 @@ class Session:
                 id=run_id,
                 config=str(self.config_path or snapshot),
                 started=datetime.datetime.now().isoformat(timespec="seconds"),
+                started_at=started_at,
                 process=process,
                 lines=collections.deque(maxlen=5000),
+                outputs=outputs,
             )
             threading.Thread(target=self._follow_run, args=(self.run,), daemon=True).start()
             self.logs.add("INFO", "run", f"Run {run_id} started")
@@ -434,6 +447,73 @@ class Session:
         run.finished = datetime.datetime.now().isoformat(timespec="seconds")
         outcome = "finished" if run.returncode == 0 else f"failed (exit status {run.returncode})"
         self.logs.add("INFO" if run.returncode == 0 else "ERROR", "run", f"Run {run.id} {outcome}")
+
+    def run_outputs(self) -> list[dict[str, Any]]:
+        """The last run's output files: each save node's file, and whether this run wrote it."""
+        if not self.run:
+            return []
+        described: list[dict[str, Any]] = []
+        for index, output in enumerate(self.run.outputs):
+            file = pathlib.Path(output["file"])
+            try:
+                stat = file.stat()
+            except OSError:
+                stat = None
+            described.append(
+                output
+                | {
+                    "index": index,
+                    "name": file.name,
+                    "size": stat.st_size if stat else None,
+                    # A file older than the run is left from before it, not this run's output.
+                    "written": stat is not None and stat.st_mtime >= self.run.started_at - 1,
+                }
+            )
+        return described
+
+    def run_output_file(self, index: int) -> pathlib.Path:
+        """The file the last run wrote for its ``index``th output.
+
+        Raises:
+            SessionError: If the run is still going, or did not write that output.
+        """
+        if not self.run:
+            raise SessionError("Nothing has been run")
+        if self.run.returncode is None:
+            raise SessionError("The run is still going")
+        outputs = self.run_outputs()
+        if not 0 <= index < len(outputs) or not outputs[index]["written"]:
+            raise SessionError("The run did not write that file")
+        return pathlib.Path(outputs[index]["file"])
+
+    def export_preview(self, node_id: str, sort: Optional[str], descending: bool) -> tuple[pathlib.Path, str, int]:
+        """Writes a node's whole preview table to a CSV file: the file, a name for it, and its rows.
+
+        Raises:
+            SessionError: If the node has no preview table, or ``sort`` is not one of its columns.
+        """
+        node = self.node(node_id)
+        if node.status != PipelineNodeStatus.RESULT:
+            raise SessionError(f"{node.name} has no preview to download")
+        target = self.state_dir / f"preview-{uuid_mod.uuid4().hex}.csv"
+        try:
+            cursor = self.graph.ddbc.cursor()
+            try:
+                table = cursor.table(node.table_name)
+                if sort is not None:
+                    if sort not in table.columns:
+                        raise SessionError(f"No column {sort}")
+                    table = table.order(
+                        f"{duckdb_escape_identifier(sort)} {'DESC' if descending else 'ASC'} NULLS LAST"
+                    )
+                [(rows,)] = cursor.table(node.table_name).count("*").fetchall()
+                table.write_csv(str(target), header=True)
+            finally:
+                cursor.close()
+        except (duckdb.CatalogException, duckdb.ConnectionException) as exc:
+            raise SessionError(f"{node.name}'s preview changed; try again once it has finished") from exc
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in node.name).strip("_") or "preview"
+        return target, f"{safe}-preview.csv", rows
 
     def stop_run(self) -> None:
         with self.lock:

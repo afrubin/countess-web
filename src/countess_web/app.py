@@ -10,15 +10,20 @@ the token travels in a header, no page from another site can make a request that
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import fnmatch
+import os
 import pathlib
 import secrets
+import threading
+import time
 from typing import Any, Optional
 
 import fastapi
 import fastapi.responses
 import fastapi.staticfiles
 import pydantic
+import starlette.background
 import starlette.requests
 
 from countess_web import VERSION
@@ -30,6 +35,62 @@ STATIC = pathlib.Path(__file__).parent / "static"
 EVENT_INTERVAL = 0.25
 # Seconds a new event socket has to send the token.
 SOCKET_AUTH_TIMEOUT = 5.0
+# Seconds a download link works for; each works once.
+DOWNLOAD_LINK_SECONDS = 60.0
+DOWNLOAD_PREFIX = "/api/download/"
+
+
+@dataclasses.dataclass(frozen=True)
+class Download:
+    file: pathlib.Path
+    filename: str
+    expires: float
+    # A file made for this download (a preview's CSV), removed once sent or expired.
+    temporary: bool
+
+
+class Downloads:
+    """One-time links to files.
+
+    A browser saves a download by following a link, which carries no request header, so the API
+    hands out a link instead: valid once, for a minute, to one file the session chose.
+    """
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.links: dict[str, Download] = {}
+
+    def issue(self, file: pathlib.Path, filename: str, temporary: bool = False) -> str:
+        key = secrets.token_urlsafe(24)
+        with self.lock:
+            self._expire()
+            self.links[key] = Download(file, filename, time.monotonic() + DOWNLOAD_LINK_SECONDS, temporary)
+        return f"{DOWNLOAD_PREFIX.lstrip('/')}{key}"
+
+    def take(self, key: str) -> Optional[Download]:
+        with self.lock:
+            self._expire()
+            return self.links.pop(key, None)
+
+    def _expire(self) -> None:
+        now = time.monotonic()
+        for key, download in list(self.links.items()):
+            if download.expires < now:
+                del self.links[key]
+                if download.temporary:
+                    remove(download.file)
+
+
+def remove(file: pathlib.Path) -> None:
+    try:
+        os.remove(file)
+    except FileNotFoundError:
+        pass
+
+
+class PreviewDownload(pydantic.BaseModel):
+    sort: Optional[str] = None
+    descending: bool = False
 
 
 class NodeCreate(pydantic.BaseModel):
@@ -66,6 +127,7 @@ class ConfigPath(pydantic.BaseModel):
 
 def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disable=too-many-locals
     app = fastapi.FastAPI(title="CountESS", version=VERSION, docs_url=None, redoc_url=None)
+    downloads = Downloads()
 
     def valid(offered: Any) -> bool:
         return isinstance(offered, str) and secrets.compare_digest(offered.encode(), token.encode())
@@ -75,7 +137,9 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
 
     @app.middleware("http")
     async def require_token(request: fastapi.Request, call_next):  # type: ignore[no-untyped-def]
-        if request.url.path.startswith("/api/") and not authorised(request):
+        # A download link is its own authority: the API issued it, to a holder of the token.
+        protected = request.url.path.startswith("/api/") and not request.url.path.startswith(DOWNLOAD_PREFIX)
+        if protected and not authorised(request):
             return fastapi.responses.JSONResponse({"detail": "Not authorised"}, status_code=401)
         return await call_next(request)
 
@@ -201,6 +265,32 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
     @app.post("/api/run")
     def run_start() -> dict[str, Any]:
         return session.start_run().summary()
+
+    @app.get("/api/run/outputs")
+    def run_outputs() -> list[dict[str, Any]]:
+        return session.run_outputs()
+
+    @app.post("/api/run/outputs/{index}/download")
+    def run_output_download(index: int) -> dict[str, Any]:
+        file = session.run_output_file(index)
+        return {"url": downloads.issue(file, file.name)}
+
+    @app.post("/api/nodes/{node_id}/preview/download")
+    def preview_download(node_id: str, body: PreviewDownload) -> dict[str, Any]:
+        file, filename, rows = session.export_preview(node_id, body.sort, body.descending)
+        return {"url": downloads.issue(file, filename, temporary=True), "rows": rows}
+
+    @app.get(DOWNLOAD_PREFIX + "{key}")
+    def download(key: str) -> Any:
+        found = downloads.take(key)
+        if found is None:
+            return fastapi.responses.PlainTextResponse(
+                "This download link has expired or was already used.", status_code=404
+            )
+        if not found.file.is_file():
+            return fastapi.responses.PlainTextResponse(f"{found.filename} is no longer there.", status_code=404)
+        background = starlette.background.BackgroundTask(remove, found.file) if found.temporary else None
+        return fastapi.responses.FileResponse(found.file, filename=found.filename, background=background)
 
     @app.post("/api/run/stop")
     def run_stop() -> dict[str, Any]:

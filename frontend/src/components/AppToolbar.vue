@@ -85,6 +85,7 @@ const runLabel = computed(() => {
     <button v-if="!store.run?.running" class="primary" :disabled="!store.graph.nodes.length" @click="run">Run</button>
     <button v-else class="danger" @click="stop">Stop run</button>
     <span class="run" :class="{ failed: store.run && !store.run.running && store.run.returncode !== 0 }">{{ runLabel }}</span>
+    <button v-if="store.run && !store.run.running" @click="store.showOutputs = true">Outputs…</button>
     <span class="title" :title="store.graph.config ?? ''">{{ title }}</span>
     <span class="connection" :class="{ off: !store.connected }" :title="store.connected ? 'Connected' : 'Reconnecting…'">●</span>
   </nav>

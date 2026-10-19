@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { api } from '../api'
+import { api, followDownload } from '../api'
 import { store } from '../store'
 import type { GraphNode, Preview } from '../types'
 
@@ -53,6 +53,21 @@ function page(step: number) {
   void load()
 }
 
+const downloading = ref(false)
+
+async function download() {
+  downloading.value = true
+  try {
+    failed.value = null
+    const link = await api.previewLink(props.node.id, sort.value, descending.value)
+    followDownload(link.url)
+  } catch (exc) {
+    failed.value = exc instanceof Error ? exc.message : String(exc)
+  } finally {
+    downloading.value = false
+  }
+}
+
 function show(value: unknown): string {
   if (value === null || value === undefined) return '—'
   if (typeof value === 'object') return JSON.stringify(value)
@@ -71,6 +86,14 @@ function show(value: unknown): string {
     <template v-else-if="preview">
       <div class="bar">
         <span>{{ preview.total.toLocaleString() }} rows</span>
+        <button
+          class="download"
+          :disabled="downloading"
+          title="Download these rows as CSV, in the order shown. A preview holds at most the preview's row limit; Run writes every row."
+          @click="download"
+        >
+          {{ downloading ? 'Preparing…' : 'Download CSV' }}
+        </button>
         <span class="pager">
           <button :disabled="offset === 0" @click="page(-1)">‹</button>
           {{ preview.total ? offset + 1 : 0 }}–{{ Math.min(offset + PAGE, preview.total) }}
@@ -119,10 +142,17 @@ function show(value: unknown): string {
 }
 .bar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   padding: 4px 8px;
   font-size: 12px;
   color: var(--muted);
+}
+.download {
+  margin-left: 12px;
+  margin-right: auto;
+  font-size: 12px;
+  padding: 1px 8px;
 }
 .scroller {
   overflow: auto;

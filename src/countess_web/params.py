@@ -130,6 +130,25 @@ def json_value(value: Any) -> JsonValue:
     return value
 
 
+def output_files(plugin: BasePlugin) -> list[tuple[str, str]]:
+    """The files a plugin is set to write, as (parameter path, absolute file path)."""
+    found = []
+
+    def walk(param: BaseParam, path: str) -> None:
+        if isinstance(param, FileSaveParam) and param.value:
+            found.append((path, param.get_file_path()))
+        elif isinstance(param, ArrayParam):
+            for n, row in enumerate(param.params):
+                walk(row, f"{path}.{n}")
+        elif isinstance(param, MultiParam):
+            for key, child in param.params.items():
+                walk(child, f"{path}.{key}")
+
+    for key, param in plugin.params.items():
+        walk(param, key)
+    return found
+
+
 def resolve(plugin: BasePlugin, path: str) -> BaseParam:
     """The parameter at ``path``.
 

@@ -24,8 +24,13 @@ In the browser:
   them, or press **Tidy**.
 - **The node panel** (right) configures the selected node: choose its plugin, set its parameters, and see a preview of
   its output that updates as the parameters change. Click a column heading to sort the preview.
-- **Run** runs the whole pipeline, writing its outputs, in a separate process: editing the pipeline while it runs does
-  not change the run, and closing the browser does not stop it. The run's output appears in the log at the bottom.
+- **Run** runs the whole pipeline in a separate process: editing the pipeline while it runs does not change the run,
+  and closing the browser does not stop it. The run's output appears in the log at the bottom.
+- **Where results go:** a run writes its files on the server, wherever each save node (CSV Save, say) is set to
+  write. **Outputs…** lists the files the last run wrote, with a button to download each to the computer showing the
+  page; **Download CSV** above a preview downloads that preview, in the order shown. A preview holds at most
+  `--preview-rows` rows (100,000 unless set); a run writes every row. On a cluster, large results are better copied
+  with `scp`, `rsync` or Globus than through the browser.
 - **Open**, **Save** and **Save as** read and write pipeline `.ini` files, and **Choose…** picks input files, all
   through a browser of the *server's* files: on a cluster, the data and the pipeline are where the job runs, not on
   the computer showing the page.
@@ -62,6 +67,8 @@ given. Anyone who can use the page can do the same.
 - It listens on `127.0.0.1` only, unless `--host` says otherwise; on a cluster the SSH tunnel reaches it there.
 - Every API request needs the token printed at start, sent in a request header, and the event stream needs it as its
   first message. The page takes the token out of the address bar and keeps it in the tab's own storage.
+- A download is a link the API issues to a holder of the token: it works once, for a minute, and only for a file the
+  last run wrote or a preview just exported, never an arbitrary path.
 - The token is never a cookie. Browsers send a `localhost` cookie to every port, so every web server on the machine
   (or reached through another tunnel) would receive it. And because it travels in a header, a page from another site
   cannot make a request that carries it, and two CountESS servers do not interfere with each other.

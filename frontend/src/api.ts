@@ -4,13 +4,25 @@ import type {
   GraphNode,
   Param,
   ParameterChange,
+  DownloadLink,
   PluginInfo,
   Preview,
+  RunOutput,
   RunSummary,
 } from './types'
 import { forgetToken, token } from './token'
 
 export class ApiError extends Error {}
+
+/** Saves the file behind a one-time download link: the browser streams it to disk. */
+export function followDownload(url: string) {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = ''
+  document.body.append(link)
+  link.click()
+  link.remove()
+}
 
 /** Raised when the server refuses the token: the page needs the address with the current one. */
 export class NotAuthorisedError extends ApiError {}
@@ -78,6 +90,10 @@ export const api = {
   run: () => request<RunSummary | null>('GET', '/api/run'),
   startRun: () => request<RunSummary>('POST', '/api/run'),
   stopRun: () => request<unknown>('POST', '/api/run/stop'),
+  runOutputs: () => request<RunOutput[]>('GET', '/api/run/outputs'),
+  runOutputLink: (index: number) => request<DownloadLink>('POST', `/api/run/outputs/${index}/download`),
+  previewLink: (id: string, sort: string | null, descending: boolean) =>
+    request<DownloadLink>('POST', `/api/nodes/${id}/preview/download`, { sort, descending }),
 
   files: (path: string | null, patterns: string[]) =>
     request<FileListing>('GET', `/api/files?${q({ path, patterns: patterns.join(',') })}`),
