@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import time
 
 import fastapi.testclient
@@ -128,7 +129,7 @@ def test_a_preview_downloads_as_csv_in_its_sort_order(
 
     assert made.json()["rows"] == 5
     assert response.text.splitlines() == ["variant,count", "beta,5", "alpha,4", "alpha,3", "beta,2", "gamma,1"]
-    assert 'filename="Load-preview.csv"' in response.headers["content-disposition"]
+    assert re.search(r'filename="\d{4}-\d{2}-\d{2}_load-preview\.csv"', response.headers["content-disposition"])
 
 
 def test_a_downloaded_preview_leaves_no_file_behind(
@@ -169,3 +170,59 @@ def test_a_node_without_a_preview_has_nothing_to_download(
     response = client.post(f"/api/nodes/{node_id(client, 'Save')}/preview/download", json={})
 
     assert response.status_code == 400
+
+
+# ---- names from the workflow ----------------------------------------------------------------------
+
+
+def name_workflow(client: fastapi.testclient.TestClient) -> None:
+    response = client.patch("/api/workflow", json={"name": "FWD test", "version": "1.2.0"})
+    assert response.status_code == 200, response.text
+
+
+def test_a_preview_download_is_named_from_the_date_workflow_and_node(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    load(client, workdir)
+    name_workflow(client)
+    settled(client)
+
+    link = client.post(f"/api/nodes/{node_id(client, 'Total')}/preview/download", json={}).json()["url"]
+    disposition = anonymous(client).get(f"/{link}").headers["content-disposition"]
+
+    assert re.search(r'filename="\d{4}-\d{2}-\d{2}_fwd-test_v1-2-0_total-preview\.csv"', disposition)
+
+
+def test_a_run_log_downloads_whole_with_a_name_from_the_workflow(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    load(client, workdir)
+    name_workflow(client)
+    finished_run(client)
+
+    link = client.post("/api/run/log/download").json()["url"]
+    response = anonymous(client).get(f"/{link}")
+
+    assert re.search(
+        r'filename="\d{4}-\d{2}-\d{2}_fwd-test_v1-2-0_run-log\.txt"', response.headers["content-disposition"]
+    )
+    assert "Finished" in response.text
+
+
+def test_a_run_writes_and_offers_a_csv_named_by_the_default_template(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    ids = load(client, workdir)
+    name_workflow(client)
+    save = client.post("/api/nodes", json={"position": [0.9, 0.9], "plugin": "countess.plugins.csv:SaveCsvPlugin"})
+    save_id = save.json()["id"]
+    client.patch(f"/api/nodes/{save_id}", json={"name": "Save Totals"})
+    client.post("/api/edges", json={"parent": ids["Total"], "child": save_id})
+    finished_run(client)
+
+    outputs = {o["node"]: o for o in client.get("/api/run/outputs").json()}
+
+    written = pathlib.Path(outputs["Save Totals"]["file"])
+    assert written.parent == workdir
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}_fwd-test_v1-2-0_save-totals\.csv", written.name)
+    assert outputs["Save Totals"]["written"] is True

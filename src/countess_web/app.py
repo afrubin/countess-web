@@ -121,6 +121,11 @@ class ParameterChange(pydantic.BaseModel):
     paths: Optional[list[str]] = None
 
 
+class Workflow(pydantic.BaseModel):
+    name: Optional[str] = None
+    version: Optional[str] = None
+
+
 class ConfigPath(pydantic.BaseModel):
     path: Optional[str] = None
 
@@ -198,6 +203,11 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
     def config_save(body: ConfigPath) -> dict[str, Any]:
         return {"path": str(session.save(body.path))}
 
+    @app.patch("/api/workflow")
+    def workflow(body: Workflow) -> dict[str, Any]:
+        session.set_workflow(body.name, body.version)
+        return session.describe_graph()
+
     @app.post("/api/graph/tidy")
     def tidy() -> dict[str, Any]:
         session.tidy()
@@ -274,6 +284,11 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
     def run_output_download(index: int) -> dict[str, Any]:
         file = session.run_output_file(index)
         return {"url": downloads.issue(file, file.name)}
+
+    @app.post("/api/run/log/download")
+    def run_log_download() -> dict[str, Any]:
+        file, filename = session.run_log()
+        return {"url": downloads.issue(file, filename)}
 
     @app.post("/api/nodes/{node_id}/preview/download")
     def preview_download(node_id: str, body: PreviewDownload) -> dict[str, Any]:

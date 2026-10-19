@@ -229,3 +229,53 @@ def test_a_loaded_pipeline_has_each_list_parameter_once(session: Session, workdi
     # Applied before the preview thread starts, so the thread cannot apply it a second time.
     assert load_node.config == []
     assert len(load_node.plugin.columns) == 2
+
+
+# ---- the workflow's name and version ------------------------------------------------------------
+
+
+def test_the_workflow_name_and_version_are_saved_with_the_pipeline(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    load(client, workdir)
+
+    graph = client.patch("/api/workflow", json={"name": "FWD test", "version": "1.2.0"}).json()
+    client.post("/api/config/save", json={})
+
+    assert graph["workflow"] == {"name": "FWD test", "version": "1.2.0"}
+    assert "[_workflow]\nname = FWD test\nversion = 1.2.0" in (workdir / "pipeline.ini").read_text()
+
+
+def test_a_version_that_is_not_semantic_is_refused(client: fastapi.testclient.TestClient) -> None:
+    response = client.patch("/api/workflow", json={"name": "FWD test", "version": "1.2"})
+
+    assert response.status_code == 400
+    assert "semantic version" in response.json()["detail"]
+
+
+def test_a_save_path_is_described_with_the_file_it_names_now(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    load(client, workdir)
+    client.patch("/api/workflow", json={"name": "FWD test", "version": "1.2.0"})
+    node = add_plugin_node(client, "countess.plugins.csv:SaveCsvPlugin")
+
+    filename = {p["path"]: p for p in client.get(f"/api/nodes/{node}/parameters").json()}["filename"]
+
+    assert filename["value"] == "{date}_{workflow}_{version}_{node}.csv"
+    assert filename["absolute"].startswith(str(workdir))
+    assert filename["absolute"].endswith("_fwd-test_v1-2-0_csv-save.csv")
+    assert "node" in filename["fields"]
+
+
+def test_a_save_path_template_that_cannot_be_filled_says_why(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    load(client, workdir)
+    node = add_plugin_node(client, "countess.plugins.csv:SaveCsvPlugin")
+
+    described = client.post(f"/api/nodes/{node}/parameters", json={"path": "filename", "value": "{nope}.csv"}).json()
+
+    filename = {p["path"]: p for p in described}["filename"]
+    assert filename["absolute"] == ""
+    assert "unknown field {nope}" in filename["templateError"]

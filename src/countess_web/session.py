@@ -22,15 +22,16 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import uuid as uuid_mod
 from collections.abc import Iterator
 from typing import Any, Optional
 
 import duckdb
 from countess.core.config import read_config, write_config
+from countess.core.parameters import set_file_base_dirs
 from countess.core.pipeline import PipelineGraph, PipelineNode, PipelineNodeStatus
 from countess.core.plugins import BasePlugin
+from countess.core.workflow import RunContext, WorkflowError, WorkflowInfo, default_filename
 from countess.utils.duckdb import duckdb_escape_identifier
 
 from countess_web import params
@@ -61,8 +62,12 @@ class RunState:
     config: str
     started: str
     started_at: float
+    # The workflow as it was when the run started, and the time its output names are made from.
+    context: RunContext
     process: subprocess.Popen
     lines: collections.deque
+    # Every line the run printed; ``lines`` keeps only the latest.
+    log_file: pathlib.Path
     # The files the pipeline's save nodes were set to write when the run started.
     outputs: list[dict[str, str]] = dataclasses.field(default_factory=list)
     finished: Optional[str] = None
@@ -180,6 +185,19 @@ class Session:
             logger.info("Saved %s", target)
             return target
 
+    def set_workflow(self, name: Optional[str], version: Optional[str]) -> None:
+        """Sets the workflow's name and version; an empty string unsets one.
+
+        Raises:
+            SessionError: If the name or version cannot be used.
+        """
+        try:
+            workflow = WorkflowInfo.from_strings(name, version)
+        except WorkflowError as exc:
+            raise SessionError(str(exc)) from exc
+        with self.change(recalculate=False):
+            self.graph.workflow = workflow
+
     def tidy(self) -> None:
         with self.change(recalculate=False):
             if self.graph.nodes:
@@ -237,6 +255,9 @@ class Session:
         except KeyError as exc:
             raise SessionError(f"No plugin {plugin}") from exc
         node.plugin = cls()
+        # A default save path (CSV Save's, say) then means a file beside the pipeline, as it would
+        # for a node read from the pipeline's file.
+        set_file_base_dirs(node.plugin.params.values(), str(self.browse_dir()))
         if node.name == "NEW":
             node.name = node.plugin.name
 
@@ -311,6 +332,7 @@ class Session:
         with self.lock:
             return {
                 "version": self.version,
+                "workflow": {"name": self.graph.workflow.name, "version": self.graph.workflow.version},
                 "config": str(self.config_path) if self.config_path else None,
                 "modified": self.modified,
                 "nodes": [self.describe_node(node) for node in self.graph.nodes],
@@ -353,7 +375,9 @@ class Session:
 
     def describe_parameters(self, node_id: str) -> list[dict[str, Any]]:
         with self.lock:
-            return params.describe_plugin(self.plugin_of(self.node(node_id)))
+            node = self.node(node_id)
+            context = RunContext(self.graph.workflow, node.name, datetime.datetime.now())
+            return params.describe_plugin(self.plugin_of(node), context)
 
     def preview(
         self, node_id: str, offset: int, limit: int, sort: Optional[str] = None, descending: bool = False
@@ -408,16 +432,20 @@ class Session:
             for node in self.graph.nodes:
                 if node.plugin:
                     node.load_config()
+            # Whole seconds: the run is told this start, and fills its file names from it as these are.
+            started = datetime.datetime.now().replace(microsecond=0)
             outputs = [
-                {"node": node.name, "parameter": path, "file": file}
+                {"node": node.name, "parameter": path, "file": file, "error": error}
                 for node in self.graph.nodes
                 if node.plugin
-                for path, file in params.output_files(node.plugin)
+                for path, file, error in params.output_files(
+                    node.plugin, RunContext(self.graph.workflow, node.name, started)
+                )
             ]
-            started_at = time.time()
+            started_at = started.timestamp()
             write_config(self.graph, str(snapshot))
             process = subprocess.Popen(  # pylint: disable=consider-using-with
-                [sys.executable, "-m", "countess_web.runner", str(snapshot)],
+                [sys.executable, "-m", "countess_web.runner", "--started", started.isoformat(), str(snapshot)],
                 cwd=str(self.config_path.parent if self.config_path else self.start_dir),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -427,10 +455,12 @@ class Session:
             self.run = RunState(
                 id=run_id,
                 config=str(self.config_path or snapshot),
-                started=datetime.datetime.now().isoformat(timespec="seconds"),
+                started=started.isoformat(),
                 started_at=started_at,
+                context=RunContext(self.graph.workflow, "run", started),
                 process=process,
                 lines=collections.deque(maxlen=5000),
+                log_file=self.state_dir / f"run-{run_id}.log",
                 outputs=outputs,
             )
             threading.Thread(target=self._follow_run, args=(self.run,), daemon=True).start()
@@ -439,10 +469,13 @@ class Session:
 
     def _follow_run(self, run: RunState) -> None:
         assert run.process.stdout is not None
-        for line in run.process.stdout:
-            line = line.rstrip()
-            run.lines.append(line)
-            self.logs.add("INFO", "run", line)
+        with open(run.log_file, "w", encoding="utf-8") as log:
+            for line in run.process.stdout:
+                log.write(line)
+                log.flush()
+                line = line.rstrip()
+                run.lines.append(line)
+                self.logs.add("INFO", "run", line)
         run.returncode = run.process.wait()
         run.finished = datetime.datetime.now().isoformat(timespec="seconds")
         outcome = "finished" if run.returncode == 0 else f"failed (exit status {run.returncode})"
@@ -454,16 +487,16 @@ class Session:
             return []
         described: list[dict[str, Any]] = []
         for index, output in enumerate(self.run.outputs):
-            file = pathlib.Path(output["file"])
+            file = pathlib.Path(output["file"]) if output["file"] else None
             try:
-                stat = file.stat()
+                stat = file.stat() if file else None
             except OSError:
                 stat = None
             described.append(
                 output
                 | {
                     "index": index,
-                    "name": file.name,
+                    "name": file.name if file else "",
                     "size": stat.st_size if stat else None,
                     # A file older than the run is left from before it, not this run's output.
                     "written": stat is not None and stat.st_mtime >= self.run.started_at - 1,
@@ -485,6 +518,16 @@ class Session:
         if not 0 <= index < len(outputs) or not outputs[index]["written"]:
             raise SessionError("The run did not write that file")
         return pathlib.Path(outputs[index]["file"])
+
+    def run_log(self) -> tuple[pathlib.Path, str]:
+        """The last run's whole log, and a name for it.
+
+        Raises:
+            SessionError: If nothing has been run.
+        """
+        if not self.run:
+            raise SessionError("Nothing has been run")
+        return self.run.log_file, default_filename(self.run.context, "log", "txt")
 
     def export_preview(self, node_id: str, sort: Optional[str], descending: bool) -> tuple[pathlib.Path, str, int]:
         """Writes a node's whole preview table to a CSV file: the file, a name for it, and its rows.
@@ -512,8 +555,8 @@ class Session:
                 cursor.close()
         except (duckdb.CatalogException, duckdb.ConnectionException) as exc:
             raise SessionError(f"{node.name}'s preview changed; try again once it has finished") from exc
-        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in node.name).strip("_") or "preview"
-        return target, f"{safe}-preview.csv", rows
+        name = default_filename(RunContext(self.graph.workflow, node.name, datetime.datetime.now()), "preview", "csv")
+        return target, name, rows
 
     def stop_run(self) -> None:
         with self.lock:
@@ -566,6 +609,7 @@ def preview_thread(graph: PipelineGraph) -> None:
     graph.thread_cursor = graph.ddbc.cursor()
     graph.thread_cursor.sql("set enable_progress_bar=true")
     graph.thread_cursor.sql("set enable_progress_bar_print=false")
+    graph.set_contexts(datetime.datetime.now())
     try:
         for node in graph.traverse_nodes():
             if graph.thread_stop:

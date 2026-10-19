@@ -34,6 +34,7 @@ from countess.core.parameters import (
     TextParam,
 )
 from countess.core.plugins import BasePlugin
+from countess.core.workflow import FILENAME_FIELDS, RunContext, WorkflowError
 
 JsonValue = Union[None, bool, int, float, str, list, dict]
 
@@ -42,30 +43,35 @@ class ParameterError(ValueError):
     """A change the browser asked for that the parameter cannot take."""
 
 
-def describe_plugin(plugin: BasePlugin) -> list[dict[str, Any]]:
-    return [describe(param, key) for key, param in plugin.params.items()]
+def describe_plugin(plugin: BasePlugin, context: RunContext) -> list[dict[str, Any]]:
+    """A plugin's parameters as JSON; ``context`` fills in output file name templates."""
+    return [describe(param, key, context) for key, param in plugin.params.items()]
 
 
-def describe(param: BaseParam, path: str) -> dict[str, Any]:  # pylint: disable=too-many-return-statements
+def describe(  # pylint: disable=too-many-return-statements
+    param: BaseParam, path: str, context: RunContext
+) -> dict[str, Any]:
     """One parameter (and those inside it) as JSON. ``kind`` says which widget draws it."""
     common = {"path": path, "label": param.label, "hide": bool(param.hide), "readOnly": bool(param.read_only)}
 
     if isinstance(param, ArrayParam):
-        return common | describe_array(param, path)
+        return common | describe_array(param, path, context)
     if isinstance(param, MultiParam):
         return common | {
             "kind": "group",
             "framed": isinstance(param, FramedMultiParam),
-            "children": [describe(p, f"{path}.{k}") for k, p in param.params.items()],
+            "children": [describe(p, f"{path}.{k}", context) for k, p in param.params.items()],
         }
     if isinstance(param, BooleanParam):
         return common | {"kind": "boolean", "value": bool(param.value)}
     if isinstance(param, MultiChoiceParam):
         return common | {"kind": "multichoice", "choices": list(param.choices), "value": list(param.get_values())}
+    if isinstance(param, FileSaveParam):
+        return common | {"kind": "file", "mode": "save", **describe_save_path(param, context)}
     if isinstance(param, FileBaseParam):
         return common | {
             "kind": "file",
-            "mode": "save" if isinstance(param, FileSaveParam) else "open",
+            "mode": "open",
             "value": param.value or "",
             "absolute": param.get_file_path() if param.value else "",
             "fileTypes": file_types(param.file_types),
@@ -85,7 +91,24 @@ def describe(param: BaseParam, path: str) -> dict[str, Any]:  # pylint: disable=
     raise TypeError(f"{path}: no description for {type(param).__name__}")
 
 
-def describe_array(param: ArrayParam, path: str) -> dict[str, Any]:
+def describe_save_path(param: FileSaveParam, context: RunContext) -> dict[str, Any]:
+    """A save path, which may be a template: the file it names for a run starting now, or why it cannot."""
+    filled, error = "", ""
+    if param.value:
+        try:
+            filled = param.get_file_path_for(context)
+        except WorkflowError as exc:
+            error = str(exc)
+    return {
+        "value": param.value or "",
+        "absolute": filled,
+        "fileTypes": file_types(param.file_types),
+        "fields": list(FILENAME_FIELDS),
+        "templateError": error,
+    }
+
+
+def describe_array(param: ArrayParam, path: str, context: RunContext) -> dict[str, Any]:
     template = param.param
     if isinstance(template, TabularMultiParam):
         layout = "table"
@@ -100,7 +123,7 @@ def describe_array(param: ArrayParam, path: str) -> dict[str, Any]:
         "layout": layout,
         "columns": [p.label for p in template.params.values()] if isinstance(template, MultiParam) else [],
         "rowLabels": isinstance(param, PerColumnArrayParam),
-        "rows": [describe(p, f"{path}.{n}") for n, p in enumerate(param.params)],
+        "rows": [describe(p, f"{path}.{n}", context) for n, p in enumerate(param.params)],
         "canAdd": editable and (param.max_size is None or size < param.max_size),
         "canDelete": editable and size > param.min_size,
         "addFiles": isinstance(param, FileArrayParam),
@@ -130,13 +153,17 @@ def json_value(value: Any) -> JsonValue:
     return value
 
 
-def output_files(plugin: BasePlugin) -> list[tuple[str, str]]:
-    """The files a plugin is set to write, as (parameter path, absolute file path)."""
+def output_files(plugin: BasePlugin, context: RunContext) -> list[tuple[str, str, str]]:
+    """The files a plugin is set to write in ``context``: (parameter path, absolute file, error).
+    A template that cannot be filled gives no file and the reason."""
     found = []
 
     def walk(param: BaseParam, path: str) -> None:
         if isinstance(param, FileSaveParam) and param.value:
-            found.append((path, param.get_file_path()))
+            try:
+                found.append((path, param.get_file_path_for(context), ""))
+            except WorkflowError as exc:
+                found.append((path, "", str(exc)))
         elif isinstance(param, ArrayParam):
             for n, row in enumerate(param.params):
                 walk(row, f"{path}.{n}")

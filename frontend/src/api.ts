@@ -70,6 +70,7 @@ export const api = {
   loadConfig: (path: string) => request<Graph>('POST', '/api/config/load', { path }),
   saveConfig: (path?: string) => request<{ path: string }>('POST', '/api/config/save', { path }),
   tidy: () => request<Graph>('POST', '/api/graph/tidy'),
+  setWorkflow: (name: string, version: string) => request<Graph>('PATCH', '/api/workflow', { name, version }),
 
   addNode: (position: [number, number], plugin?: string) =>
     request<GraphNode>('POST', '/api/nodes', { position, plugin }),
@@ -92,6 +93,7 @@ export const api = {
   stopRun: () => request<unknown>('POST', '/api/run/stop'),
   runOutputs: () => request<RunOutput[]>('GET', '/api/run/outputs'),
   runOutputLink: (index: number) => request<DownloadLink>('POST', `/api/run/outputs/${index}/download`),
+  runLogLink: () => request<DownloadLink>('POST', '/api/run/log/download'),
   previewLink: (id: string, sort: string | null, descending: boolean) =>
     request<DownloadLink>('POST', `/api/nodes/${id}/preview/download`, { sort, descending }),
 

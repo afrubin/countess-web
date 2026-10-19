@@ -8,6 +8,7 @@ import GraphView from './components/GraphView.vue'
 import LogPanel from './components/LogPanel.vue'
 import NodePanel from './components/NodePanel.vue'
 import RunOutputs from './components/RunOutputs.vue'
+import WorkflowDialog from './components/WorkflowDialog.vue'
 
 const node = computed(selectedNode)
 
@@ -44,6 +45,7 @@ onMounted(async () => {
     </main>
     <LogPanel />
     <RunOutputs v-if="store.showOutputs" />
+    <WorkflowDialog v-if="store.showWorkflow" />
     <FileBrowser v-if="store.fileDialog" :options="store.fileDialog.options" @done="store.fileDialog.resolve" />
   </div>
 </template>

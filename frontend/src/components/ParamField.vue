@@ -51,10 +51,22 @@ async function toggleChoice(choice: string, on: boolean) {
   await commit(props.param.choices.filter((c) => values.has(c)))
 }
 
+const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
+const dirName = (path: string) => path.slice(0, Math.max(path.lastIndexOf('/'), 0))
+
 async function browse() {
   if (props.param.kind !== 'file') return
   const paths = await actions.chooseFiles(props.param.label, props.param.mode, props.param.fileTypes, props.param.absolute)
-  if (paths && paths.length) await commit(paths[0])
+  if (!paths || !paths.length) return
+  const chosen = paths[0]
+  // Saving to another folder under the name the template gave keeps the template: the file is
+  // then named afresh by each run, not fixed to today's name.
+  const template = baseName(props.param.value)
+  if (props.param.mode === 'save' && template.includes('{') && baseName(chosen) === baseName(props.param.absolute)) {
+    await commit(`${dirName(chosen)}/${template}`)
+  } else {
+    await commit(chosen)
+  }
 }
 
 async function addRow() {
@@ -166,6 +178,27 @@ const rowCells = (row: Param): Param[] => (row.kind === 'group' ? row.children :
         </label>
       </span>
 
+      <span v-else-if="param.kind === 'file' && param.mode === 'save'" class="save-path">
+        <span class="file">
+          <input
+            v-model="local"
+            :disabled="param.readOnly"
+            spellcheck="false"
+            @focus="focused = true"
+            @change="commitText"
+            @blur="commitText"
+          />
+          <button :disabled="param.readOnly" @click.prevent="browse">Choose…</button>
+        </span>
+        <span v-if="param.templateError" class="template-error">{{ param.templateError }}</span>
+        <span v-else-if="param.absolute" class="template-result" :title="param.absolute">
+          → {{ baseName(param.absolute) }} <span class="template-dir">in {{ dirName(param.absolute) }}</span>
+        </span>
+        <span v-if="param.fields?.length" class="template-fields">
+          Fields: <code v-for="field in param.fields" :key="field">{{ '{' + field + '}' }}</code>
+        </span>
+      </span>
+
       <span v-else-if="param.kind === 'file'" class="file">
         <span class="file-name" :title="param.absolute">{{ fileName || '(none)' }}</span>
         <button :disabled="param.readOnly" @click.prevent="browse">Choose…</button>
@@ -262,6 +295,34 @@ legend {
   gap: 8px;
   align-items: center;
   min-width: 0;
+}
+.save-path {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.save-path input {
+  flex: 1;
+  font-family: var(--mono);
+}
+.template-result,
+.template-fields {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.template-dir {
+  opacity: 0.75;
+}
+.template-fields code {
+  margin-left: 4px;
+}
+.template-error {
+  color: var(--bad);
+  font-size: 12px;
 }
 .file-name {
   overflow: hidden;

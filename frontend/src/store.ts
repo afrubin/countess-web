@@ -11,7 +11,7 @@ interface FileDialog {
 }
 
 export const store = reactive({
-  graph: { version: -1, config: null, modified: false, nodes: [] } as Graph,
+  graph: { version: -1, workflow: { name: null, version: null }, config: null, modified: false, nodes: [] } as Graph,
   plugins: [] as PluginInfo[],
   selectedId: null as string | null,
   logs: [] as LogRecord[],
@@ -21,6 +21,7 @@ export const store = reactive({
   authorised: true,
   fileDialog: null as FileDialog | null,
   showOutputs: false,
+  showWorkflow: false,
 })
 
 export function selectedNode() {

@@ -26,6 +26,13 @@ In the browser:
   its output that updates as the parameters change. Click a column heading to sort the preview.
 - **Run** runs the whole pipeline in a separate process: editing the pipeline while it runs does not change the run,
   and closing the browser does not stop it. The run's output appears in the log at the bottom.
+- **Workflow** (the button showing the workflow's name, once it has one) sets a short name and a semantic version
+  for the pipeline, saved with it. Output file names are made from them: a new CSV Save writes
+  `{date}_{workflow}_{version}_{node}.csv` beside the pipeline file, such as
+  `2026-10-19_fwd-saturation_v1-2-0_save-results.csv`, so that runs on different days or of different versions do
+  not overwrite each other. A save node's filename can use the fields `{date}`, `{time}`, `{workflow}`, `{version}`
+  and `{node}` in any arrangement; the page shows the file it names now. Downloads follow the same pattern:
+  `…_total-preview.csv` for a preview, `…_run-log.txt` for a run's log.
 - **Where results go:** a run writes its files on the server, wherever each save node (CSV Save, say) is set to
   write. **Outputs…** lists the files the last run wrote, with a button to download each to the computer showing the
   page; **Download CSV** above a preview downloads that preview, in the order shown. A preview holds at most
@@ -105,6 +112,11 @@ declare their parameters without any interface code. countess-web replaces only 
   and `PipelineGraph.run` opening its own DuckDB connection with no way to pass its settings.
 - No Open OnDemand app definition yet, and no submission of runs as their own batch jobs. The page uses relative
   addresses so it can be served under a proxy's path prefix, but this has not been tried behind Open OnDemand.
+
+## Requirements
+
+countess-web needs a CountESS with workflow names and versions (its `countess.core.workflow` module), which is
+not in a CountESS release yet; until it is, install CountESS from the branch that adds it.
 
 ## Development
 

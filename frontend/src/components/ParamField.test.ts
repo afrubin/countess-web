@@ -76,4 +76,48 @@ describe('ParamField', () => {
 
     expect(wrapper.find('input').exists()).toBe(false)
   })
+
+  it('keeps a save path template when only its folder is chosen', async () => {
+    const { wrapper, actions } = mountField(
+      {
+        ...base,
+        kind: 'file',
+        path: 'filename',
+        label: 'Filename',
+        value: '{date}_{node}.csv',
+        absolute: '/data/run1/2026-10-19_save.csv',
+        mode: 'save',
+        fileTypes: [],
+        fields: ['date', 'node'],
+      },
+      ['/data/run2/2026-10-19_save.csv'],
+    )
+
+    await wrapper.find('button').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve))
+
+    expect(actions.change).toHaveBeenCalledWith({ path: 'filename', value: '/data/run2/{date}_{node}.csv' })
+  })
+
+  it('takes a save path typed as a new name', async () => {
+    const { wrapper, actions } = mountField(
+      {
+        ...base,
+        kind: 'file',
+        path: 'filename',
+        label: 'Filename',
+        value: '{date}_{node}.csv',
+        absolute: '/data/run1/2026-10-19_save.csv',
+        mode: 'save',
+        fileTypes: [],
+        fields: ['date', 'node'],
+      },
+      ['/data/run2/final.csv'],
+    )
+
+    await wrapper.find('button').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve))
+
+    expect(actions.change).toHaveBeenCalledWith({ path: 'filename', value: '/data/run2/final.csv' })
+  })
 })

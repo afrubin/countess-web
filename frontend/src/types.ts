@@ -26,8 +26,14 @@ export interface GraphNode {
   plugin: NodePlugin | null
 }
 
+export interface Workflow {
+  name: string | null
+  version: string | null
+}
+
 export interface Graph {
   version: number
+  workflow: Workflow
   config: string | null
   modified: boolean
   nodes: GraphNode[]
@@ -55,7 +61,16 @@ export type ScalarParam = ParamBase &
     | { kind: 'choice'; value: string | null; choices: string[] }
     | { kind: 'combo'; value: string | number | null; choices: string[] }
     | { kind: 'multichoice'; value: string[]; choices: string[] }
-    | { kind: 'file'; value: string; absolute: string; mode: 'open' | 'save'; fileTypes: FileType[] }
+    | {
+        kind: 'file'
+        value: string
+        absolute: string
+        mode: 'open' | 'save'
+        fileTypes: FileType[]
+        // save paths only: the template fields, and why the template cannot be filled
+        fields?: string[]
+        templateError?: string
+      }
   )
 
 export type GroupParam = ParamBase & { kind: 'group'; framed: boolean; children: Param[] }
@@ -113,6 +128,7 @@ export interface RunOutput {
   name: string
   size: number | null
   written: boolean
+  error: string
 }
 
 export interface DownloadLink {

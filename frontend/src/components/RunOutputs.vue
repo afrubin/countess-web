@@ -15,6 +15,15 @@ onMounted(async () => {
   }
 })
 
+async function downloadLog() {
+  try {
+    failed.value = null
+    followDownload((await api.runLogLink()).url)
+  } catch (exc) {
+    failed.value = exc instanceof Error ? exc.message : String(exc)
+  }
+}
+
 async function download(output: RunOutput) {
   try {
     failed.value = null
@@ -48,8 +57,9 @@ function size(bytes: number | null): string {
         <tbody>
           <tr v-for="output in outputs" :key="output.index" :class="{ missing: !output.written }">
             <td>
-              <div class="name">{{ output.name }}</div>
-              <div class="path" :title="output.file">{{ output.node }} · {{ output.file }}</div>
+              <div class="name">{{ output.name || output.node }}</div>
+              <div v-if="output.error" class="path failed">{{ output.error }}</div>
+              <div v-else class="path" :title="output.file">{{ output.node }} · {{ output.file }}</div>
             </td>
             <td class="size">{{ output.written ? size(output.size) : 'not written by this run' }}</td>
             <td>
@@ -59,6 +69,7 @@ function size(bytes: number | null): string {
         </tbody>
       </table>
       <footer>
+        <button @click="downloadLog">Download run log</button>
         <button @click="store.showOutputs = false">Close</button>
       </footer>
     </div>
@@ -129,6 +140,7 @@ td {
 footer {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 10px;
 }
 </style>

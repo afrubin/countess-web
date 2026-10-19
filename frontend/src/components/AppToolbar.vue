@@ -63,6 +63,10 @@ const title = computed(() => {
   return `${name}${store.graph.modified ? ' •' : ''}`
 })
 
+const workflowLabel = computed(() =>
+  [store.graph.workflow.name, store.graph.workflow.version && `v${store.graph.workflow.version}`].filter(Boolean).join(' '),
+)
+
 const runLabel = computed(() => {
   const r = store.run
   if (!r) return ''
@@ -78,6 +82,10 @@ const runLabel = computed(() => {
     <button @click="open">Open…</button>
     <button @click="save(false)">Save</button>
     <button @click="save(true)">Save as…</button>
+    <span class="sep" />
+    <button :title="workflowLabel ? 'Change the workflow\'s name or version' : 'Name and version this workflow'" @click="store.showWorkflow = true">
+      {{ workflowLabel || 'Workflow…' }}
+    </button>
     <span class="sep" />
     <button @click="addNode">Add node</button>
     <button @click="tidy">Tidy</button>
