@@ -3,6 +3,7 @@ Load (counts.csv) -> Total (Group By variant, sum count) -> Save (totals.csv).""
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 
@@ -188,3 +189,57 @@ def test_a_named_workflow_names_the_run_outputs_and_log(app: Page, server: Serve
 
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}_e2e-test_v2-0-1_run-log\.txt", download.value.suggested_filename)
     assert len(list((server.workdir / "out").glob("*_e2e-test_v2-0-1_save.csv"))) == 1
+
+
+# ---- themes and text size -----------------------------------------------------------------------
+
+
+def computed(page: Page, prop: str) -> str:
+    return page.evaluate(f"getComputedStyle(document.body).{prop}")
+
+
+def choose_view(page: Page, setting: str, value: str) -> None:
+    page.get_by_role("button", name="View").click()
+    page.locator(f".view-menu input[name={setting}][value={value}]").check()
+    page.get_by_role("button", name="View").click()
+
+
+def test_the_dark_theme_and_presentation_size_apply_and_are_remembered(app: Page) -> None:
+    choose_view(app, "theme", "dark")
+    choose_view(app, "text-size", "presentation")
+
+    assert computed(app, "backgroundColor") == "rgb(20, 23, 30)"
+    assert computed(app, "fontSize") == "21px"
+    app.reload()
+    app.wait_for_selector(".pipeline-node")
+    assert (computed(app, "backgroundColor"), computed(app, "fontSize")) == ("rgb(20, 23, 30)", "21px")
+
+
+def test_a_theme_saved_as_a_file_can_be_edited_and_loaded_back(app: Page, tmp_path: pathlib.Path) -> None:
+    choose_view(app, "theme", "light")
+    app.get_by_role("button", name="View").click()
+    with app.expect_download() as download:
+        app.get_by_role("button", name="Save current theme as a file").click()
+    theme = json.loads(pathlib.Path(download.value.path()).read_text())
+    theme["label"] = "Lab slides"
+    theme["colors"]["background"] = "#fdf6e3"
+    edited = tmp_path / "lab-slides.json"
+    edited.write_text(json.dumps(theme))
+
+    app.locator(".view-menu input[type=file]").set_input_files(edited)
+
+    expect(app.locator(".view-menu .user-theme")).to_contain_text("Lab slides")
+    assert computed(app, "backgroundColor") == "rgb(253, 246, 227)"
+
+
+def test_a_theme_file_with_a_colour_missing_is_refused_with_its_reason(app: Page, tmp_path: pathlib.Path) -> None:
+    broken = tmp_path / "broken.json"
+    broken.write_text(
+        json.dumps({"format": "countess-web-theme", "version": 1, "label": "Broken", "scheme": "light", "colors": {}})
+    )
+    app.get_by_role("button", name="View").click()
+
+    app.locator(".view-menu input[type=file]").set_input_files(broken)
+
+    expect(app.locator(".view-menu .errors")).to_contain_text('"colors" has no "background"')
+    expect(app.locator(".view-menu .user-theme")).to_have_count(0)

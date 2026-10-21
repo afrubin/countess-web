@@ -134,25 +134,25 @@ function show(value: unknown): string {
 }
 .message {
   padding: 12px;
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .message.error pre {
-  color: var(--bad);
+  color: var(--color-bad);
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px;
-  font-size: 12px;
-  color: var(--muted);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 .download {
   margin-left: 12px;
   margin-right: auto;
-  font-size: 12px;
+  font-size: var(--text-sm);
   padding: 1px 8px;
 }
 .scroller {
@@ -161,13 +161,13 @@ function show(value: unknown): string {
 }
 table {
   border-collapse: collapse;
-  font-size: 12px;
-  font-family: var(--mono);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
 }
 th {
   position: sticky;
   top: 0;
-  background: var(--surface-2);
+  background: var(--color-surface-alt);
   cursor: pointer;
   text-align: left;
   padding: 4px 8px;
@@ -175,12 +175,12 @@ th {
 }
 .type {
   font-weight: normal;
-  color: var(--muted);
-  font-size: 10px;
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
 }
 td {
   padding: 2px 8px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
   white-space: nowrap;
   max-width: 420px;
   overflow: hidden;
@@ -190,6 +190,6 @@ td.number {
   text-align: right;
 }
 td.null {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 </style>

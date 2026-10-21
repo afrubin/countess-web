@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { VueFlow, useVueFlow, type Connection, type EdgeMouseEvent, type NodeDragEvent, type NodeMouseEvent } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -9,19 +9,34 @@ import '@vue-flow/controls/dist/style.css'
 import PipelineNode from './PipelineNode.vue'
 import { api } from '../api'
 import { attempt, refreshGraph, store } from '../store'
+import { activeTextSize, activeTheme, view } from '../theme/theme'
 
 // CountESS keeps node positions as fractions of the canvas; the graph is drawn on this area.
-const WIDTH = 950
-const HEIGHT = 480
+// It grows with the text size, as the nodes do, so that larger nodes keep the same gaps.
+const BASE_WIDTH = 950
+const BASE_HEIGHT = 480
+const NORMAL_TEXT_PX = 14
+const scale = computed(() => activeTextSize().basePx / NORMAL_TEXT_PX)
+const width = computed(() => BASE_WIDTH * scale.value)
+const height = computed(() => BASE_HEIGHT * scale.value)
 
-const { screenToFlowCoordinate } = useVueFlow()
+const { screenToFlowCoordinate, fitView } = useVueFlow()
+
+// A new text size changes every node's size and place: fit the graph to the view again.
+watch(
+  () => view.textSize,
+  async () => {
+    await nextTick()
+    await fitView()
+  },
+)
 const selectedEdge = ref<{ parent: string; child: string } | null>(null)
 
 const nodes = computed(() =>
   store.graph.nodes.map((n) => ({
     id: n.id,
     type: 'countess',
-    position: { x: n.position[0] * WIDTH, y: n.position[1] * HEIGHT },
+    position: { x: n.position[0] * width.value, y: n.position[1] * height.value },
     data: n,
     selected: n.id === store.selectedId,
   })),
@@ -40,7 +55,7 @@ const edges = computed(() =>
 )
 
 function toFraction(x: number, y: number): [number, number] {
-  return [Math.max(0, Math.min(1, x / WIDTH)), Math.max(0, Math.min(1, y / HEIGHT))]
+  return [Math.max(0, Math.min(1, x / width.value)), Math.max(0, Math.min(1, y / height.value))]
 }
 
 async function onDragStop(event: NodeDragEvent) {
@@ -98,7 +113,8 @@ async function onPaneClick(event: MouseEvent) {
       <template #node-countess="props">
         <PipelineNode :data="props.data" :selected="props.data.id === store.selectedId" />
       </template>
-      <Background />
+      <!-- An SVG attribute, which a CSS variable cannot fill: the theme's colour itself. -->
+      <Background :color="activeTheme().colors['canvas-pattern']" />
       <Controls :show-interactive="false" />
     </VueFlow>
     <div v-if="selectedEdge" class="edge-actions">
@@ -124,7 +140,7 @@ async function onPaneClick(event: MouseEvent) {
   top: 45%;
   width: 100%;
   text-align: center;
-  color: var(--muted);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 </style>

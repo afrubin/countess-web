@@ -45,13 +45,13 @@ async function save() {
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.35);
+  background: var(--color-backdrop);
   display: grid;
   place-items: center;
   z-index: 100;
 }
 .dialog {
-  background: var(--surface);
+  background: var(--color-surface);
   border-radius: 8px;
   width: min(520px, 92vw);
   padding: 14px 16px;
@@ -61,7 +61,7 @@ async function save() {
 }
 h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--text-lg);
 }
 label {
   display: grid;
@@ -70,12 +70,12 @@ label {
   gap: 8px;
 }
 .hint {
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
   margin: 0;
 }
 .failed {
-  color: var(--bad);
+  color: var(--color-bad);
   margin: 0;
 }
 footer {

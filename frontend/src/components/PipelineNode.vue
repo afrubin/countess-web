@@ -38,17 +38,17 @@ function statusTitle(node: GraphNode): string {
 
 <style scoped>
 .pipeline-node {
-  min-width: 120px;
-  max-width: 180px;
-  padding: 6px 10px;
+  min-width: 8.5rem;
+  max-width: 13rem;
+  padding: 0.4em 0.7em;
   border-radius: 6px;
-  border: 2px solid var(--border);
+  border: 2px solid var(--color-border);
   border-left-width: 6px;
-  background: var(--surface);
-  font-size: 13px;
+  background: var(--color-surface);
+  font-size: var(--text-md);
 }
 .pipeline-node.selected {
-  box-shadow: 0 0 0 3px var(--focus);
+  box-shadow: 0 0 0 3px var(--color-focus);
 }
 .name {
   font-weight: 600;
@@ -57,20 +57,20 @@ function statusTitle(node: GraphNode): string {
   white-space: nowrap;
 }
 .plugin {
-  font-size: 11px;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 .dirty,
 .working {
-  border-left-color: var(--working);
+  border-left-color: var(--color-working);
 }
 .result {
-  border-left-color: var(--ok);
+  border-left-color: var(--color-ok);
 }
 .error {
-  border-left-color: var(--bad);
+  border-left-color: var(--color-bad);
 }
 .no-preview {
-  border-left-color: var(--muted);
+  border-left-color: var(--color-text-muted);
 }
 </style>

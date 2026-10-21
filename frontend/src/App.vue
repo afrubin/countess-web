@@ -63,7 +63,7 @@ main {
   min-height: 0;
 }
 .graph {
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--color-border);
   min-height: 0;
 }
 .detail {
@@ -78,11 +78,11 @@ main {
 }
 .placeholder {
   padding: 24px;
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .error-banner {
-  background: var(--bad-bg);
-  color: var(--bad);
+  background: var(--color-bad-surface);
+  color: var(--color-bad);
   padding: 6px 12px;
   display: flex;
   justify-content: space-between;
@@ -95,7 +95,7 @@ main {
   }
   .graph {
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--color-border);
   }
 }
 </style>

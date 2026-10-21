@@ -1,35 +1,8 @@
-:root {
-  --surface: #ffffff;
-  --surface-2: #f4f5f7;
-  --text: #1d2330;
-  --muted: #667085;
-  --border: #d5d9e0;
-  --focus: #cfe0ff;
-  --accent: #2f6fde;
-  --ok: #2e9d5b;
-  --working: #d08a14;
-  --bad: #c43d3d;
-  --bad-bg: #fbeaea;
-  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #1b1f27;
-    --surface-2: #232834;
-    --text: #e6e9ef;
-    --muted: #98a2b3;
-    --border: #3a4150;
-    --focus: #2a3f66;
-    --accent: #6e9cf0;
-    --ok: #4cc27f;
-    --working: #e5a93a;
-    --bad: #ef6b6b;
-    --bad-bg: #3a2326;
-    color-scheme: dark;
-  }
-}
+/*
+ * Global styles. Every colour is a --color-* token and every font size a --text-* step, set on the
+ * root element by the active theme and text size (src/theme); nothing here or in a component names a
+ * colour of its own. Padding is in em so that it grows with the text.
+ */
 
 * {
   box-sizing: border-box;
@@ -37,60 +10,109 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 14px;
-  color: var(--text);
-  background: var(--surface);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+a {
+  color: var(--color-accent);
 }
 
 button {
   font: inherit;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
+  padding: 0.3em 0.7em;
+  border: 1px solid var(--color-border);
   border-radius: 5px;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
 }
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--color-accent);
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 button:disabled {
   opacity: 0.5;
   cursor: default;
 }
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 button.danger {
-  color: var(--bad);
+  color: var(--color-bad);
 }
 button.icon {
   border: none;
   background: none;
-  padding: 2px 6px;
-  color: var(--muted);
+  padding: 0.15em 0.45em;
+  color: var(--color-text-muted);
 }
 
 input,
 select,
 textarea {
   font: inherit;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
+  padding: 0.3em 0.45em;
+  border: 1px solid var(--color-border);
   border-radius: 5px;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 input[type='checkbox'] {
   width: auto;
   justify-self: start;
+  accent-color: var(--color-accent);
+}
+code {
+  font-family: var(--font-mono);
 }
 
+/* The graph (Vue Flow): its own variables and hard-coded colours, mapped onto the tokens. */
+.vue-flow {
+  --vf-node-bg: var(--color-surface);
+  --vf-node-text: var(--color-text);
+  --vf-connection-path: var(--color-edge-active);
+  --vf-handle: var(--color-handle);
+  background: var(--color-canvas);
+}
 .vue-flow__node-countess {
   padding: 0;
   border: none;
   background: none;
+}
+.vue-flow__edge-path {
+  stroke: var(--color-edge);
+}
+.vue-flow__edge.selected .vue-flow__edge-path,
+.vue-flow__edge:focus .vue-flow__edge-path {
+  stroke: var(--color-edge-active);
+}
+.vue-flow__handle {
+  background: var(--color-handle);
+  border-color: var(--color-surface);
+}
+.vue-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+}
+.vue-flow__controls-button {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.vue-flow__controls-button svg {
+  fill: currentColor;
+}
+.vue-flow__controls-button:hover {
+  background: var(--color-surface-alt);
 }

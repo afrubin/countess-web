@@ -42,6 +42,20 @@ In the browser:
   through a browser of the *server's* files: on a cluster, the data and the pipeline are where the job runs, not on
   the computer showing the page.
 
+## Themes and text size
+
+**View** in the toolbar chooses a colour theme (Light, Dark, or System, which follows the computer's setting) and a
+text size: Normal, Large, or Presentation, which enlarges all the text, controls, tables and graph nodes for
+screenshots on slides and for projectors. Both are remembered by the browser; they are not part of the pipeline. The
+graph is always fitted to its pane, so a wide pipeline's nodes stay small at any text size; zoom in with the graph's
+**+** for a close-up.
+
+You can add a theme of your own. **Save current theme as a file** writes the theme in use as JSON, a value for every
+colour; edit the colours (any CSS colour: `#rrggbb`, `rgb()`, `oklch()` and so on) and the `label`, then **Load a theme
+file…**. A file missing a colour, or naming one that does not exist, is refused with the reason; a loaded theme whose
+text would be hard to read (below WCAG's contrast ratios) is accepted with a warning naming the colours. Each colour's
+role is described in [`frontend/src/theme/tokens.ts`](frontend/src/theme/tokens.ts).
+
 ## On an HPC cluster
 
 Run `countess_web` inside a job, so the previews and runs use the job's allocation rather than a shared login node:
@@ -162,6 +176,10 @@ cd frontend && npm run generate:api
 Neither file can fall behind unnoticed: `tests/test_schema.py` fails if `openapi.json` is not the server's schema, and
 `npm run build` (through `npm run check:api`) fails if `api-schema.ts` is not what `openapi.json` generates. A model
 change that the page does not follow then fails the page's type-check.
+
+Every colour and font size in the page's styles is a design token (`frontend/src/theme/tokens.ts`), which the active
+theme and text size set as CSS custom properties; a new built-in theme is one more entry in `presets.ts`, which the
+type-checker holds to every token and `theme.test.ts` to WCAG's contrast ratios.
 
 `npm run lint` runs ESLint with typescript-eslint's strict, type-checked rules; the compiler runs with `strict`,
 `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.

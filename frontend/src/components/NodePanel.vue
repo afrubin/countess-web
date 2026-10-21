@@ -156,12 +156,12 @@ header {
 }
 .node-name {
   flex: 1;
-  font-size: 18px;
+  font-size: var(--text-xl);
   font-weight: 600;
 }
 .description {
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
 }
 .notes {
   width: 100%;
@@ -186,12 +186,12 @@ header {
 }
 .plugin span {
   display: block;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 .preview-pane {
   flex: 1 1 45%;
   min-height: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
 }
 </style>

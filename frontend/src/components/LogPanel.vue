@@ -36,8 +36,8 @@ watch(
 
 <style scoped>
 .log-panel {
-  border-top: 1px solid var(--border);
-  background: var(--surface-2);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
 }
 .toggle {
   border: none;
@@ -47,19 +47,19 @@ watch(
 .lines {
   height: 180px;
   overflow: auto;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   padding: 0 10px 6px;
 }
 .time,
 .source {
-  color: var(--muted);
+  color: var(--color-text-muted);
   margin-right: 8px;
 }
 .warning {
-  color: var(--working);
+  color: var(--color-working);
 }
 .error {
-  color: var(--bad);
+  color: var(--color-bad);
 }
 </style>

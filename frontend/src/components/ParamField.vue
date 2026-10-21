@@ -338,7 +338,7 @@ function selectedValue(event: Event): string {
   grid-template-columns: 1fr;
 }
 .label {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 fieldset {
   border: none;
@@ -347,7 +347,7 @@ fieldset {
 }
 fieldset.framed,
 fieldset.array {
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 6px 10px;
   margin: 6px 0;
@@ -363,8 +363,8 @@ legend {
 .array-table th {
   text-align: left;
   font-weight: 500;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 .array-table td,
 .array-table th {
@@ -413,17 +413,17 @@ legend {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 .save-path input {
   flex: 1;
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 .allowed,
 .template-result,
 .template-fields {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -435,8 +435,8 @@ legend {
   margin-left: 4px;
 }
 .template-error {
-  color: var(--bad);
-  font-size: 12px;
+  color: var(--color-bad);
+  font-size: var(--text-sm);
 }
 .add {
   margin-top: 4px;
@@ -449,6 +449,6 @@ textarea {
   box-sizing: border-box;
 }
 textarea {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 </style>

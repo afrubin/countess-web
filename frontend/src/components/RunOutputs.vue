@@ -80,13 +80,13 @@ function size(bytes: number | null): string {
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.35);
+  background: var(--color-backdrop);
   display: grid;
   place-items: center;
   z-index: 100;
 }
 .dialog {
-  background: var(--surface);
+  background: var(--color-surface);
   border-radius: 8px;
   width: min(760px, 92vw);
   max-height: 80vh;
@@ -95,17 +95,17 @@ function size(bytes: number | null): string {
 }
 h2 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: var(--text-lg);
 }
 .where,
 .empty,
 .size,
 .path {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .where {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: var(--text-md);
 }
 table {
   width: 100%;
@@ -113,14 +113,14 @@ table {
 }
 td {
   padding: 6px 4px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
   vertical-align: middle;
 }
 .name {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 .path {
-  font-size: 12px;
+  font-size: var(--text-sm);
   max-width: 480px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -128,14 +128,14 @@ td {
 }
 .size {
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--text-sm);
   text-align: right;
 }
 .missing .name {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .failed {
-  color: var(--bad);
+  color: var(--color-bad);
 }
 footer {
   display: flex;

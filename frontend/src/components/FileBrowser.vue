@@ -121,13 +121,13 @@ function size(bytes: number | null): string {
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.35);
+  background: var(--color-backdrop);
   display: grid;
   place-items: center;
   z-index: 100;
 }
 .dialog {
-  background: var(--surface);
+  background: var(--color-surface);
   border-radius: 8px;
   width: min(720px, 92vw);
   max-height: 80vh;
@@ -138,7 +138,7 @@ function size(bytes: number | null): string {
 }
 h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--text-lg);
 }
 .location {
   display: flex;
@@ -146,7 +146,7 @@ h2 {
 }
 .location input {
   flex: 1;
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 .entries {
   list-style: none;
@@ -154,7 +154,7 @@ h2 {
   padding: 0;
   overflow: auto;
   flex: 1;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   min-height: 200px;
 }
@@ -165,17 +165,17 @@ h2 {
   cursor: pointer;
 }
 .entries li:hover {
-  background: var(--surface-2);
+  background: var(--color-surface-alt);
 }
 .entries li.chosen {
-  background: var(--focus);
+  background: var(--color-focus);
 }
 .size,
 .empty {
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 .failed {
-  color: var(--bad);
+  color: var(--color-bad);
 }
 .save-name {
   display: flex;
@@ -193,6 +193,6 @@ footer {
 }
 footer span {
   margin-right: auto;
-  color: var(--muted);
+  color: var(--color-text-muted);
 }
 </style>

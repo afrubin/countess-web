@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { api } from '../api'
 import { attempt, chooseFiles, refreshGraph, setGraph, store } from '../store'
+import ViewMenu from './ViewMenu.vue'
 
 const INI = [{ label: 'CountESS pipelines', patterns: ['*.ini'] }, { label: 'All files', patterns: ['*'] }]
 
@@ -96,6 +97,7 @@ const runLabel = computed(() => {
     <span class="run" :class="{ failed: store.run && !store.run.running && store.run.returncode !== 0 }">{{ runLabel }}</span>
     <button v-if="store.run && !store.run.running" @click="store.showOutputs = true">Outputs…</button>
     <span class="title" :title="store.graph.config ?? ''">{{ title }}</span>
+    <ViewMenu />
     <span class="connection" :class="{ off: !store.connected }" :title="store.connected ? 'Connected' : 'Reconnecting…'">●</span>
   </nav>
 </template>
@@ -106,8 +108,8 @@ const runLabel = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
 }
 .brand {
   margin-right: 8px;
@@ -115,25 +117,25 @@ const runLabel = computed(() => {
 .sep {
   width: 1px;
   height: 20px;
-  background: var(--border);
+  background: var(--color-border);
   margin: 0 4px;
 }
 .run {
-  font-size: 12px;
-  color: var(--muted);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 .run.failed {
-  color: var(--bad);
+  color: var(--color-bad);
 }
 .title {
   margin-left: auto;
-  font-family: var(--mono);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
 }
 .connection {
-  color: var(--ok);
+  color: var(--color-ok);
 }
 .connection.off {
-  color: var(--bad);
+  color: var(--color-bad);
 }
 </style>
