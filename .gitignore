@@ -5,3 +5,4 @@ src/countess_web/static/
 frontend/node_modules/
 frontend/dist/
 .DS_Store
+test-results/

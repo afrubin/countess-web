@@ -22,6 +22,9 @@ dev = [
     "httpx>=0.27",
     "pytest>=8",
 ]
+e2e = [
+    "pytest-playwright>=0.5",
+]
 
 [project.scripts]
 countess_web = "countess_web.cli:main"
@@ -44,7 +47,9 @@ artifacts = ["src/countess_web/static/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+# Browser tests need the page built and a browser installed; they run with `pytest -m e2e`.
+addopts = "--strict-markers -m 'not e2e'"
+markers = ["e2e: drives the built page in a browser (needs `npm run build` and `playwright install chromium`)"]
 
 [tool.black]
 line-length = 120

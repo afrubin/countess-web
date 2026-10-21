@@ -122,7 +122,7 @@ not in a CountESS release yet; until it is, install CountESS from the branch tha
 
 ```shell
 pip install -e ".[dev]"
-pytest
+pytest                       # the server's tests
 
 cd frontend
 npm ci
@@ -130,6 +130,21 @@ npm test
 npm run lint
 npm run build      # checks the generated API types, type-checks, then builds into ../src/countess_web/static
 ```
+
+The browser tests drive the built page in headless Chromium, each against a fresh server over `tests/data`: the
+token, previews, parameter changes, building and saving a pipeline, runs, downloads and the workflow dialog. They are
+left out of a plain `pytest`; to run them:
+
+```shell
+pip install -e ".[dev,e2e]"
+python -m playwright install chromium
+(cd frontend && npm run build)
+pytest -m e2e
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the server's tests, the front end's lint, unit tests, type-check
+and build, and the browser tests, keeping a Playwright trace of any that fail. It installs CountESS from the git
+ref in `COUNTESS_REF`, since countess-web needs CountESS's workflow names and versions, which no release has yet.
 
 ### The API's types
 

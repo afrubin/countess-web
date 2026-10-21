@@ -26,6 +26,9 @@ from countess_web.session import Session
 
 logger = logging.getLogger(__name__)
 
+# Seconds a stopping server waits for open connections (a page's event socket) before closing them.
+SHUTDOWN_SECONDS = 2
+
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="countess_web", description="CountESS in a web browser")
@@ -103,7 +106,15 @@ def main(argv: Optional[list[str]] = None) -> None:
         threading.Timer(1.0, webbrowser.open, args=(url,)).start()
 
     try:
-        uvicorn.run(create_app(session, token), host=args.host, port=port, log_level="warning")
+        # An open page holds its event socket open indefinitely; without a timeout, stopping the server
+        # (Ctrl-C) would wait for every browser tab to close.
+        uvicorn.run(
+            create_app(session, token),
+            host=args.host,
+            port=port,
+            log_level="warning",
+            timeout_graceful_shutdown=SHUTDOWN_SECONDS,
+        )
     finally:
         session.close()
 
