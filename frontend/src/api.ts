@@ -1,21 +1,14 @@
-import type {
-  FileListing,
-  Graph,
-  GraphNode,
-  Param,
-  ParameterChange,
-  DownloadLink,
-  PluginInfo,
-  Preview,
-  RunOutput,
-  RunSummary,
-} from './types'
+import type { paths } from './api-schema'
+import type { NodeUpdate, ParameterChange, ResponseOf } from './types'
 import { forgetToken, token } from './token'
 
 export class ApiError extends Error {}
 
+/** Raised when the server refuses the token: the page needs the address with the current one. */
+export class NotAuthorisedError extends ApiError {}
+
 /** Saves the file behind a one-time download link: the browser streams it to disk. */
-export function followDownload(url: string) {
+export function followDownload(url: string): void {
   const link = document.createElement('a')
   link.href = url
   link.download = ''
@@ -24,79 +17,96 @@ export function followDownload(url: string) {
   link.remove()
 }
 
-/** Raised when the server refuses the token: the page needs the address with the current one. */
-export class NotAuthorisedError extends ApiError {}
+type Method = 'get' | 'post' | 'patch' | 'delete'
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+/**
+ * Calls a route of the API. ``route`` is the path as the schema names it (``/api/nodes/{node_id}``);
+ * ``url`` is the same path with its parameters filled in. The body sent back is typed from the
+ * schema, so a route's response cannot be read as some other shape.
+ */
+async function call<P extends keyof paths, M extends Method & keyof paths[P]>(
+  method: M,
+  _route: P,
+  url: string,
+  body?: unknown,
+): Promise<ResponseOf<P, M>> {
   // Relative, so the page also works behind a proxy that serves it under a path prefix.
-  const response = await fetch(url.replace(/^\//, ''), {
-    method,
-    credentials: 'omit',
-    headers: {
-      'x-countess-token': token(),
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  const headers: Record<string, string> = { 'x-countess-token': token() }
+  const init: RequestInit = { method: method.toUpperCase(), credentials: 'omit', headers }
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify(body)
+  }
+  const response = await fetch(url.replace(/^\//, ''), init)
   if (response.status === 401) {
     forgetToken()
     throw new NotAuthorisedError('This page is not authorised: open CountESS with the address it printed.')
   }
   if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`
-    try {
-      const json = await response.json()
-      if (typeof json.detail === 'string') detail = json.detail
-      else if (json.detail) detail = JSON.stringify(json.detail)
-    } catch {
-      // the error body was not JSON; keep the status line
-    }
-    throw new ApiError(detail)
+    throw new ApiError(await errorDetail(response))
   }
-  return (await response.json()) as T
+  return (await response.json()) as ResponseOf<P, M>
 }
 
-const q = (params: Record<string, string | number | boolean | undefined | null>) =>
+async function errorDetail(response: Response): Promise<string> {
+  try {
+    const json: unknown = await response.json()
+    if (typeof json === 'object' && json !== null && 'detail' in json) {
+      const detail = json.detail
+      return typeof detail === 'string' ? detail : JSON.stringify(detail)
+    }
+  } catch {
+    // the error body was not JSON; report the status line
+  }
+  return `${response.status} ${response.statusText}`
+}
+
+const query = (params: Record<string, string | number | boolean | undefined | null>): string =>
   new URLSearchParams(
-    Object.entries(params)
-      .filter(([, v]) => v !== undefined && v !== null)
-      .map(([k, v]) => [k, String(v)]),
+    Object.entries(params).flatMap(([k, v]) => (v === undefined || v === null ? [] : [[k, String(v)]])),
   ).toString()
 
+const id = encodeURIComponent
+
 export const api = {
-  plugins: () => request<PluginInfo[]>('GET', '/api/plugins'),
-  graph: () => request<Graph>('GET', '/api/graph'),
-  newConfig: () => request<Graph>('POST', '/api/config/new'),
-  loadConfig: (path: string) => request<Graph>('POST', '/api/config/load', { path }),
-  saveConfig: (path?: string) => request<{ path: string }>('POST', '/api/config/save', { path }),
-  tidy: () => request<Graph>('POST', '/api/graph/tidy'),
-  setWorkflow: (name: string, version: string) => request<Graph>('PATCH', '/api/workflow', { name, version }),
+  plugins: () => call('get', '/api/plugins', '/api/plugins'),
+  graph: () => call('get', '/api/graph', '/api/graph'),
+  newConfig: () => call('post', '/api/config/new', '/api/config/new'),
+  loadConfig: (path: string) => call('post', '/api/config/load', '/api/config/load', { path }),
+  saveConfig: (path?: string) => call('post', '/api/config/save', '/api/config/save', { path }),
+  tidy: () => call('post', '/api/graph/tidy', '/api/graph/tidy'),
+  setWorkflow: (name: string, version: string) =>
+    call('patch', '/api/workflow', '/api/workflow', { name, version }),
 
   addNode: (position: [number, number], plugin?: string) =>
-    request<GraphNode>('POST', '/api/nodes', { position, plugin }),
-  updateNode: (id: string, changes: { name?: string; position?: [number, number]; notes?: string }) =>
-    request<GraphNode>('PATCH', `/api/nodes/${id}`, changes),
-  deleteNode: (id: string) => request<unknown>('DELETE', `/api/nodes/${id}`),
-  setPlugin: (id: string, plugin: string) => request<GraphNode>('POST', `/api/nodes/${id}/plugin`, { plugin }),
+    call('post', '/api/nodes', '/api/nodes', { position, plugin }),
+  updateNode: (nodeId: string, changes: NodeUpdate) =>
+    call('patch', '/api/nodes/{node_id}', `/api/nodes/${id(nodeId)}`, changes),
+  deleteNode: (nodeId: string) => call('delete', '/api/nodes/{node_id}', `/api/nodes/${id(nodeId)}`),
+  setPlugin: (nodeId: string, plugin: string) =>
+    call('post', '/api/nodes/{node_id}/plugin', `/api/nodes/${id(nodeId)}/plugin`, { plugin }),
 
-  connect: (parent: string, child: string) => request<unknown>('POST', '/api/edges', { parent, child }),
-  disconnect: (parent: string, child: string) => request<unknown>('DELETE', `/api/edges?${q({ parent, child })}`),
+  connect: (parent: string, child: string) => call('post', '/api/edges', '/api/edges', { parent, child }),
+  disconnect: (parent: string, child: string) =>
+    call('delete', '/api/edges', `/api/edges?${query({ parent, child })}`),
 
-  parameters: (id: string) => request<Param[]>('GET', `/api/nodes/${id}/parameters`),
-  changeParameter: (id: string, change: ParameterChange) =>
-    request<Param[]>('POST', `/api/nodes/${id}/parameters`, change),
-  preview: (id: string, offset: number, limit: number, sort: string | null, descending: boolean) =>
-    request<Preview>('GET', `/api/nodes/${id}/preview?${q({ offset, limit, sort, descending })}`),
+  parameters: (nodeId: string) =>
+    call('get', '/api/nodes/{node_id}/parameters', `/api/nodes/${id(nodeId)}/parameters`),
+  changeParameter: (nodeId: string, change: ParameterChange) =>
+    call('post', '/api/nodes/{node_id}/parameters', `/api/nodes/${id(nodeId)}/parameters`, change),
+  preview: (nodeId: string, offset: number, limit: number) =>
+    call('get', '/api/nodes/{node_id}/preview', `/api/nodes/${id(nodeId)}/preview?${query({ offset, limit })}`),
 
-  run: () => request<RunSummary | null>('GET', '/api/run'),
-  startRun: () => request<RunSummary>('POST', '/api/run'),
-  stopRun: () => request<unknown>('POST', '/api/run/stop'),
-  runOutputs: () => request<RunOutput[]>('GET', '/api/run/outputs'),
-  runOutputLink: (index: number) => request<DownloadLink>('POST', `/api/run/outputs/${index}/download`),
-  runLogLink: () => request<DownloadLink>('POST', '/api/run/log/download'),
-  previewLink: (id: string, sort: string | null, descending: boolean) =>
-    request<DownloadLink>('POST', `/api/nodes/${id}/preview/download`, { sort, descending }),
+  run: () => call('get', '/api/run', '/api/run'),
+  startRun: () => call('post', '/api/run', '/api/run'),
+  stopRun: () => call('post', '/api/run/stop', '/api/run/stop'),
+  runOutputs: () => call('get', '/api/run/outputs', '/api/run/outputs'),
+  runOutputLink: (index: number) =>
+    call('post', '/api/run/outputs/{index}/download', `/api/run/outputs/${index}/download`),
+  runLogLink: () => call('post', '/api/run/log/download', '/api/run/log/download'),
+  previewLink: (nodeId: string) =>
+    call('post', '/api/nodes/{node_id}/preview/download', `/api/nodes/${id(nodeId)}/preview/download`),
 
   files: (path: string | null, patterns: string[]) =>
-    request<FileListing>('GET', `/api/files?${q({ path, patterns: patterns.join(',') })}`),
+    call('get', '/api/files', `/api/files?${query({ path, patterns: patterns.join(',') })}`),
 }

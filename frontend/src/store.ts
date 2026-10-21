@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 import { api, ApiError, NotAuthorisedError } from './api'
 import { token } from './token'
-import type { FileDialogOptions, Graph, LogRecord, PluginInfo, RunSummary, Status } from './types'
+import type { EventHello, FileDialogOptions, Graph, LogRecord, PluginInfo, RunSummary, ServerEvent, StateEvent } from './types'
 
 const MAX_LOGS = 1000
 
@@ -10,21 +10,38 @@ interface FileDialog {
   resolve: (paths: string[] | null) => void
 }
 
-export const store = reactive({
-  graph: { version: -1, workflow: { name: null, version: null }, config: null, modified: false, nodes: [] } as Graph,
-  plugins: [] as PluginInfo[],
-  selectedId: null as string | null,
-  logs: [] as LogRecord[],
-  run: null as RunSummary | null,
-  error: null as string | null,
+interface State {
+  graph: Graph
+  plugins: PluginInfo[]
+  selectedId: string | null
+  logs: LogRecord[]
+  run: RunSummary | null
+  error: string | null
+  connected: boolean
+  authorised: boolean
+  fileDialog: FileDialog | null
+  showOutputs: boolean
+  showWorkflow: boolean
+}
+
+const initial: State = {
+  // Version -1 is no graph yet: the first state event fetches the real one.
+  graph: { version: -1, workflow: { name: null, version: null }, config: null, modified: false, nodes: [] },
+  plugins: [],
+  selectedId: null,
+  logs: [],
+  run: null,
+  error: null,
   connected: false,
   authorised: true,
-  fileDialog: null as FileDialog | null,
+  fileDialog: null,
   showOutputs: false,
   showWorkflow: false,
-})
+}
 
-export function selectedNode() {
+export const store = reactive<State>(initial)
+
+export function selectedNode(): Graph['nodes'][number] | null {
   return store.graph.nodes.find((n) => n.id === store.selectedId) ?? null
 }
 
@@ -40,12 +57,12 @@ export async function attempt<T>(action: () => Promise<T>): Promise<T | undefine
   }
 }
 
-export async function refreshGraph() {
+export async function refreshGraph(): Promise<void> {
   const graph = await attempt(api.graph)
   if (graph) setGraph(graph)
 }
 
-export function setGraph(graph: Graph) {
+export function setGraph(graph: Graph): void {
   store.graph = graph
   if (store.selectedId && !graph.nodes.some((n) => n.id === store.selectedId)) store.selectedId = null
 }
@@ -62,25 +79,28 @@ export function chooseFiles(options: FileDialogOptions): Promise<string[] | null
   })
 }
 
-interface StateEvent {
-  type: 'state'
-  version: number
-  modified: boolean
-  nodes: Record<string, { status: Status; message: string }>
+const EVENT_TYPES: ReadonlySet<string> = new Set<ServerEvent['type']>(['state', 'run', 'logs'])
+
+/**
+ * An event-socket message as the event it is. The page is served by the server whose events it
+ * reads, so their shapes are the generated types; this checks only that the message is an event
+ * at all, of a type the page knows, and ignores anything else.
+ */
+function parseEvent(data: unknown): ServerEvent | null {
+  if (typeof data !== 'string') return null
+  const parsed: unknown = JSON.parse(data)
+  if (typeof parsed !== 'object' || parsed === null || !('type' in parsed)) return null
+  return typeof parsed.type === 'string' && EVENT_TYPES.has(parsed.type) ? (parsed as ServerEvent) : null
 }
-type ServerEvent =
-  | StateEvent
-  | { type: 'run'; run: RunSummary | null }
-  | { type: 'logs'; records: LogRecord[] }
 
 /** Follows the server's events, reconnecting when the connection drops. */
-export function connectEvents() {
+export function connectEvents(): void {
   const url = new URL('api/events', location.href)
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const since = store.logs.length ? store.logs[store.logs.length - 1].seq : 0
+  const hello: EventHello = { token: token(), since: store.logs.at(-1)?.seq ?? 0 }
   const socket = new WebSocket(url)
   socket.onopen = () => {
-    socket.send(JSON.stringify({ token: token(), since }))
+    socket.send(JSON.stringify(hello))
     store.connected = true
   }
   socket.onclose = (event) => {
@@ -91,18 +111,25 @@ export function connectEvents() {
     }
     setTimeout(connectEvents, 2000)
   }
-  socket.onmessage = (message) => {
-    const event = JSON.parse(message.data) as ServerEvent
-    if (event.type === 'state') applyState(event)
-    else if (event.type === 'run') store.run = event.run
-    else if (event.type === 'logs') {
-      store.logs.push(...event.records)
-      if (store.logs.length > MAX_LOGS) store.logs.splice(0, store.logs.length - MAX_LOGS)
+  socket.onmessage = (message: MessageEvent<unknown>) => {
+    const event = parseEvent(message.data)
+    if (event === null) return
+    switch (event.type) {
+      case 'state':
+        applyState(event)
+        break
+      case 'run':
+        store.run = event.run
+        break
+      case 'logs':
+        store.logs.push(...event.records)
+        if (store.logs.length > MAX_LOGS) store.logs.splice(0, store.logs.length - MAX_LOGS)
+        break
     }
   }
 }
 
-function applyState(event: StateEvent) {
+function applyState(event: StateEvent): void {
   if (event.version !== store.graph.version) {
     void refreshGraph()
     return

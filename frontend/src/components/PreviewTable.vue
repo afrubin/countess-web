@@ -1,23 +1,23 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { api, followDownload } from '../api'
-import { store } from '../store'
+import { attempt, refreshGraph, store } from '../store'
 import type { GraphNode, Preview } from '../types'
 
+// A node's preview is sorted as CountESS's GUI sorts it: by the node's own column number and
+// direction (saved with the pipeline), then by its other columns.
 const props = defineProps<{ node: GraphNode }>()
 const PAGE = 100
 
 const preview = ref<Preview | null>(null)
 const offset = ref(0)
-const sort = ref<string | null>(null)
-const descending = ref(false)
 const failed = ref<string | null>(null)
 
-async function load() {
+async function load(): Promise<void> {
   if (props.node.status !== 'RESULT') return
   try {
     failed.value = null
-    preview.value = await api.preview(props.node.id, offset.value, PAGE, sort.value, descending.value)
+    preview.value = await api.preview(props.node.id, offset.value, PAGE)
   } catch (exc) {
     failed.value = exc instanceof Error ? exc.message : String(exc)
   }
@@ -30,7 +30,6 @@ watch(
   ([, status], previous) => {
     if (previous && previous[0] !== props.node.id) {
       offset.value = 0
-      sort.value = null
       preview.value = null
     }
     if (status === 'RESULT') void load()
@@ -38,28 +37,28 @@ watch(
   { immediate: true },
 )
 
-function sortBy(column: string) {
-  if (sort.value === column) descending.value = !descending.value
-  else {
-    sort.value = column
-    descending.value = false
-  }
+/** Sorts by column number ``index``: a second click on the same column reverses it. */
+async function sortBy(index: number): Promise<void> {
+  const sortDescending = index === props.node.sortColumn ? !props.node.sortDescending : false
   offset.value = 0
-  void load()
+  if ((await attempt(() => api.updateNode(props.node.id, { sortColumn: index, sortDescending }))) !== undefined) {
+    await refreshGraph()
+    await load()
+  }
 }
 
-function page(step: number) {
+function page(step: number): void {
   offset.value = Math.max(0, offset.value + step * PAGE)
   void load()
 }
 
 const downloading = ref(false)
 
-async function download() {
+async function download(): Promise<void> {
   downloading.value = true
   try {
     failed.value = null
-    const link = await api.previewLink(props.node.id, sort.value, descending.value)
+    const link = await api.previewLink(props.node.id)
     followDownload(link.url)
   } catch (exc) {
     failed.value = exc instanceof Error ? exc.message : String(exc)
@@ -68,10 +67,12 @@ async function download() {
   }
 }
 
+/** A cell as the preview model sends it: null, true or false, a number, text, or a list or object. */
 function show(value: unknown): string {
   if (value === null || value === undefined) return '—'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
 }
 </script>
 
@@ -104,9 +105,9 @@ function show(value: unknown): string {
         <table>
           <thead>
             <tr>
-              <th v-for="column in preview.columns" :key="column.name" @click="sortBy(column.name)">
+              <th v-for="(column, index) in preview.columns" :key="column.name" @click="sortBy(index)">
                 {{ column.name }}
-                <span v-if="sort === column.name">{{ descending ? '▼' : '▲' }}</span>
+                <span v-if="index === node.sortColumn">{{ node.sortDescending ? '▼' : '▲' }}</span>
                 <div class="type">{{ column.type }}</div>
               </th>
             </tr>

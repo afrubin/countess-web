@@ -30,17 +30,40 @@ def test_a_loaded_pipeline_previews_each_nodes_result(
 ) -> None:
     ids = load(client, workdir)
 
-    rows = preview_rows(client, ids["Total"], sort="variant")
+    rows = preview_rows(client, ids["Total"])
 
     assert rows == [["alpha", 7], ["beta", 7], ["gamma", 1]]
 
 
-def test_a_preview_pages_and_sorts(client: fastapi.testclient.TestClient, workdir: pathlib.Path) -> None:
+def test_a_preview_is_sorted_by_its_first_column_unless_told_otherwise(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
     ids = load(client, workdir)
 
-    rows = preview_rows(client, ids["Load"], sort="count", descending=True, offset=1, limit=2)
+    rows = preview_rows(client, ids["Load"])
+
+    # CountESS's GUI sorts by column 0, then by the others: alpha 3 before alpha 4.
+    assert rows == [["alpha", 3], ["alpha", 4], ["beta", 2], ["beta", 5], ["gamma", 1]]
+
+
+def test_a_preview_pages_in_the_nodes_sort_order(client: fastapi.testclient.TestClient, workdir: pathlib.Path) -> None:
+    ids = load(client, workdir)
+    client.patch(f"/api/nodes/{ids['Load']}", json={"sortColumn": 1, "sortDescending": True})
+
+    rows = preview_rows(client, ids["Load"], offset=1, limit=2)
 
     assert rows == [["alpha", 4], ["alpha", 3]]
+
+
+def test_a_nodes_preview_sort_is_saved_with_the_pipeline(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    ids = load(client, workdir)
+
+    client.patch(f"/api/nodes/{ids['Load']}", json={"sortColumn": 1, "sortDescending": True})
+    client.post("/api/config/save", json={})
+
+    assert "_sort = 1 1" in (workdir / "pipeline.ini").read_text().split("[Total]")[0]
 
 
 def test_a_changed_parameter_recalculates_the_preview(
@@ -53,7 +76,7 @@ def test_a_changed_parameter_recalculates_the_preview(
     assert response.status_code == 200, response.text
     client.post(f"/api/nodes/{ids['Total']}/parameters", json={"path": "columns.1.max", "value": True})
 
-    assert preview_rows(client, ids["Total"], sort="variant") == [["alpha", 4], ["beta", 5], ["gamma", 1]]
+    assert preview_rows(client, ids["Total"]) == [["alpha", 4], ["beta", 5], ["gamma", 1]]
 
 
 def test_a_parameter_is_described_by_the_path_its_ini_key_uses(
@@ -65,13 +88,9 @@ def test_a_parameter_is_described_by_the_path_its_ini_key_uses(
     parameters = client.get(f"/api/nodes/{ids['Load']}/parameters").json()
 
     by_path = {p["path"]: p for p in parameters}
-    assert by_path["header"] == by_path["header"] | {"kind": "boolean", "value": True}
-    columns = by_path["columns"]
-    assert columns["kind"] == "array"
-    assert (
-        columns["rows"][0]["children"][0] | {"path": "columns.0.name", "value": "variant"}
-        == columns["rows"][0]["children"][0]
-    )
+    assert (by_path["header"]["kind"], by_path["header"]["value"]) == ("boolean", True)
+    first_column_name = by_path["columns"]["items"][0]["children"][0]
+    assert (first_column_name["path"], first_column_name["value"]) == ("columns.0.name", "variant")
 
 
 def test_a_parameter_that_does_not_exist_is_refused(
@@ -95,9 +114,9 @@ def test_a_row_can_be_added_to_and_deleted_from_a_list(
     client.post(path, json={"path": "sorting.1.order_by", "value": "count__sum"})
     deleted = client.post(path, json={"path": "sorting", "action": "delete", "index": 0}).json()
 
-    assert len({p["path"]: p for p in added}["sorting"]["rows"]) == 2
-    [remaining] = {p["path"]: p for p in deleted}["sorting"]["rows"]
-    assert remaining["children"][0]["value"] == "count__sum"
+    assert len({p["path"]: p for p in added}["sorting"]["items"]) == 2
+    [remaining] = {p["path"]: p for p in deleted}["sorting"]["items"]
+    assert remaining["children"][0]["selected"] == "count__sum"
 
 
 def test_a_new_node_with_a_plugin_joins_the_pipeline(
@@ -110,9 +129,10 @@ def test_a_new_node_with_a_plugin_joins_the_pipeline(
     ).json()
     response = client.post("/api/edges", json={"parent": ids["Load"], "child": node["id"]})
     client.post(f"/api/nodes/{node['id']}/parameters", json={"path": "code", "value": "double = count * 2"})
+    client.patch(f"/api/nodes/{node['id']}", json={"sortColumn": 2})
 
     assert response.status_code == 200, response.text
-    assert preview_rows(client, node["id"], sort="double")[-1] == ["beta", 5, 10]
+    assert preview_rows(client, node["id"])[-1] == ["beta", 5, 10]
 
 
 def test_an_edge_that_would_make_a_loop_is_refused(

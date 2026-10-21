@@ -5,6 +5,9 @@ first message. The page reads the token once, from the address the server prints
 (``/?token=...``), and keeps it in the tab's own storage. A cookie would not do: browsers send a
 localhost cookie to every port, so every local web server would receive the token. And because
 the token travels in a header, no page from another site can make a request that carries it.
+
+Every route declares its response model (countess_web.models), so the OpenAPI schema the browser's
+types are generated from describes exactly what the routes send.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ import time
 from typing import Any, Optional
 
 import fastapi
+import fastapi.openapi.utils
 import fastapi.responses
 import fastapi.staticfiles
 import pydantic
@@ -27,6 +31,7 @@ import starlette.background
 import starlette.requests
 
 from countess_web import VERSION
+from countess_web import models
 from countess_web.session import Session, SessionError
 
 TOKEN_HEADER = "x-countess-token"
@@ -88,49 +93,7 @@ def remove(file: pathlib.Path) -> None:
         pass
 
 
-class PreviewDownload(pydantic.BaseModel):
-    sort: Optional[str] = None
-    descending: bool = False
-
-
-class NodeCreate(pydantic.BaseModel):
-    position: tuple[float, float] = (0.5, 0.5)
-    plugin: Optional[str] = None
-
-
-class NodeUpdate(pydantic.BaseModel):
-    name: Optional[str] = None
-    position: Optional[tuple[float, float]] = None
-    notes: Optional[str] = None
-
-
-class PluginChoice(pydantic.BaseModel):
-    plugin: str
-
-
-class Edge(pydantic.BaseModel):
-    parent: str
-    child: str
-
-
-class ParameterChange(pydantic.BaseModel):
-    path: str
-    value: Any = None
-    action: Optional[str] = None
-    index: Optional[int] = None
-    paths: Optional[list[str]] = None
-
-
-class Workflow(pydantic.BaseModel):
-    name: Optional[str] = None
-    version: Optional[str] = None
-
-
-class ConfigPath(pydantic.BaseModel):
-    path: Optional[str] = None
-
-
-def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disable=too-many-locals
+def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disable=too-many-locals,too-many-statements
     app = fastapi.FastAPI(title="CountESS", version=VERSION, docs_url=None, redoc_url=None)
     downloads = Downloads()
 
@@ -168,134 +131,137 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
     # ---- the pipeline ----------------------------------------------------------------------------
 
     @app.get("/api/plugins")
-    def plugins() -> list[dict[str, Any]]:
+    def plugins() -> list[models.PluginInfo]:
         return sorted(
             (
-                {
-                    "key": key,
-                    "name": cls.name,
-                    "description": " ".join(cls.description.split()),
-                    "numInputs": cls.num_inputs,
-                    "numOutputs": cls.num_outputs,
-                }
+                models.PluginInfo(
+                    key=key,
+                    name=cls.name,
+                    description=" ".join(cls.description.split()),
+                    numInputs=cls.num_inputs,
+                    numOutputs=cls.num_outputs,
+                )
                 for key, cls in session.plugin_classes().items()
             ),
-            key=lambda p: str(p["name"]).lower(),
+            key=lambda p: p.name.lower(),
         )
 
     @app.get("/api/graph")
-    def graph() -> dict[str, Any]:
+    def graph() -> models.Graph:
         return session.describe_graph()
 
     @app.post("/api/config/new")
-    def config_new() -> dict[str, Any]:
+    def config_new() -> models.Graph:
         session.new()
         return session.describe_graph()
 
     @app.post("/api/config/load")
-    def config_load(body: ConfigPath) -> dict[str, Any]:
+    def config_load(body: models.ConfigPath) -> models.Graph:
         if not body.path:
             raise SessionError("Choose a pipeline to load")
         session.load(body.path)
         return session.describe_graph()
 
     @app.post("/api/config/save")
-    def config_save(body: ConfigPath) -> dict[str, Any]:
-        return {"path": str(session.save(body.path))}
+    def config_save(body: models.ConfigPath) -> models.SavedConfig:
+        return models.SavedConfig(path=str(session.save(body.path)))
 
     @app.patch("/api/workflow")
-    def workflow(body: Workflow) -> dict[str, Any]:
+    def workflow(body: models.WorkflowUpdate) -> models.Graph:
         session.set_workflow(body.name, body.version)
         return session.describe_graph()
 
     @app.post("/api/graph/tidy")
-    def tidy() -> dict[str, Any]:
+    def tidy() -> models.Graph:
         session.tidy()
         return session.describe_graph()
 
     @app.post("/api/nodes")
-    def node_create(body: NodeCreate) -> dict[str, Any]:
+    def node_create(body: models.NodeCreate) -> models.Node:
         return session.describe_node(session.add_node(body.position, body.plugin))
 
     @app.patch("/api/nodes/{node_id}")
-    def node_update(node_id: str, body: NodeUpdate) -> dict[str, Any]:
-        session.update_node(node_id, name=body.name, position=body.position, notes=body.notes)
+    def node_update(node_id: str, body: models.NodeUpdate) -> models.Node:
+        session.update_node(
+            node_id,
+            name=body.name,
+            position=body.position,
+            notes=body.notes,
+            sort_column=body.sortColumn,
+            sort_descending=body.sortDescending,
+        )
         return session.describe_node(session.node(node_id))
 
     @app.delete("/api/nodes/{node_id}")
-    def node_delete(node_id: str) -> dict[str, Any]:
+    def node_delete(node_id: str) -> models.Deleted:
         session.delete_node(node_id)
-        return {"deleted": node_id}
+        return models.Deleted(deleted=node_id)
 
     @app.post("/api/nodes/{node_id}/plugin")
-    def node_plugin(node_id: str, body: PluginChoice) -> dict[str, Any]:
+    def node_plugin(node_id: str, body: models.PluginChoice) -> models.Node:
         session.set_plugin(node_id, body.plugin)
         return session.describe_node(session.node(node_id))
 
     @app.post("/api/edges")
-    def edge_create(body: Edge) -> dict[str, Any]:
+    def edge_create(body: models.Edge) -> models.Edge:
         session.connect(body.parent, body.child)
-        return body.model_dump()
+        return body
 
     @app.delete("/api/edges")
-    def edge_delete(parent: str, child: str) -> dict[str, Any]:
+    def edge_delete(parent: str, child: str) -> models.Edge:
         session.disconnect(parent, child)
-        return {"parent": parent, "child": child}
+        return models.Edge(parent=parent, child=child)
 
     @app.get("/api/nodes/{node_id}/parameters")
-    def parameters(node_id: str) -> list[dict[str, Any]]:
+    def parameters(node_id: str) -> list[models.Param]:
         return session.describe_parameters(node_id)
 
     @app.post("/api/nodes/{node_id}/parameters")
-    def parameter_change(node_id: str, body: ParameterChange) -> list[dict[str, Any]]:
-        change = body.model_dump(exclude_none=True)
-        if "value" not in body.model_fields_set:
-            change.pop("value", None)
-        else:
-            change["value"] = body.value
-        session.change_parameter(node_id, body.path, change)
+    def parameter_change(node_id: str, body: models.ParameterChange) -> list[models.Param]:
+        session.change_parameter(node_id, body)
         return session.describe_parameters(node_id)
 
     @app.get("/api/nodes/{node_id}/preview")
-    def preview(
-        node_id: str,
-        offset: int = 0,
-        limit: int = 100,
-        sort: Optional[str] = None,
-        descending: bool = False,
-    ) -> dict[str, Any]:
-        return session.preview(node_id, offset, limit, sort, descending)
+    def preview(node_id: str, offset: int = 0, limit: int = 100) -> models.Preview:
+        return session.preview(node_id, offset, limit)
 
     # ---- runs ------------------------------------------------------------------------------------
 
     @app.get("/api/run")
-    def run_state() -> Optional[dict[str, Any]]:
+    def run_state() -> Optional[models.RunSummary]:
         return session.run.summary() if session.run else None
 
     @app.post("/api/run")
-    def run_start() -> dict[str, Any]:
+    def run_start() -> models.RunSummary:
         return session.start_run().summary()
 
+    @app.post("/api/run/stop")
+    def run_stop() -> models.Stopping:
+        session.stop_run()
+        return models.Stopping(stopping=True)
+
+    # ---- downloads -------------------------------------------------------------------------------
+
     @app.get("/api/run/outputs")
-    def run_outputs() -> list[dict[str, Any]]:
+    def run_outputs() -> list[models.RunOutput]:
         return session.run_outputs()
 
     @app.post("/api/run/outputs/{index}/download")
-    def run_output_download(index: int) -> dict[str, Any]:
+    def run_output_download(index: int) -> models.DownloadLink:
         file = session.run_output_file(index)
-        return {"url": downloads.issue(file, file.name)}
+        return models.DownloadLink(url=downloads.issue(file, file.name))
 
     @app.post("/api/run/log/download")
-    def run_log_download() -> dict[str, Any]:
+    def run_log_download() -> models.DownloadLink:
         file, filename = session.run_log()
-        return {"url": downloads.issue(file, filename)}
+        return models.DownloadLink(url=downloads.issue(file, filename))
 
     @app.post("/api/nodes/{node_id}/preview/download")
-    def preview_download(node_id: str, body: PreviewDownload) -> dict[str, Any]:
-        file, filename, rows = session.export_preview(node_id, body.sort, body.descending)
-        return {"url": downloads.issue(file, filename, temporary=True), "rows": rows}
+    def preview_download(node_id: str) -> models.DownloadLink:
+        file, filename, rows = session.export_preview(node_id)
+        return models.DownloadLink(url=downloads.issue(file, filename, temporary=True), rows=rows)
 
-    @app.get(DOWNLOAD_PREFIX + "{key}")
+    @app.get(DOWNLOAD_PREFIX + "{key}", include_in_schema=False)
     def download(key: str) -> Any:
         found = downloads.take(key)
         if found is None:
@@ -307,15 +273,10 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
         background = starlette.background.BackgroundTask(remove, found.file) if found.temporary else None
         return fastapi.responses.FileResponse(found.file, filename=found.filename, background=background)
 
-    @app.post("/api/run/stop")
-    def run_stop() -> dict[str, Any]:
-        session.stop_run()
-        return {"stopping": True}
-
     # ---- files on the server ---------------------------------------------------------------------
 
     @app.get("/api/files")
-    def files(path: Optional[str] = None, patterns: Optional[str] = None, hidden: bool = False) -> dict[str, Any]:
+    def files(path: Optional[str] = None, patterns: Optional[str] = None, hidden: bool = False) -> models.FileListing:
         return list_dir(pathlib.Path(path).expanduser() if path else session.browse_dir(), patterns, hidden)
 
     # ---- events ----------------------------------------------------------------------------------
@@ -324,30 +285,29 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
     async def events(socket: fastapi.WebSocket) -> None:
         await socket.accept()
         try:
-            hello = await asyncio.wait_for(socket.receive_json(), SOCKET_AUTH_TIMEOUT)
-        except (asyncio.TimeoutError, ValueError, fastapi.WebSocketDisconnect):
+            hello = models.EventHello.model_validate(await asyncio.wait_for(socket.receive_json(), SOCKET_AUTH_TIMEOUT))
+        except (asyncio.TimeoutError, ValueError, pydantic.ValidationError, fastapi.WebSocketDisconnect):
             hello = None
-        if not isinstance(hello, dict) or not valid(hello.get("token")):
+        if hello is None or not valid(hello.token):
             await socket.close(code=4401)
             return
-        last_state: Optional[dict[str, Any]] = None
-        last_run: Optional[dict[str, Any]] = None
-        since = hello.get("since", 0)
-        seq = since if isinstance(since, int) else 0
+        last_state: Optional[models.StateEvent] = None
+        last_run: Optional[models.RunSummary] = None
+        seq = hello.since
         try:
             while True:
                 state = session.statuses()
                 if state != last_state:
-                    await socket.send_json({"type": "state", **state})
+                    await socket.send_json(state.model_dump(mode="json"))
                     last_state = state
                 run = session.run.summary() if session.run else None
-                if run != last_run:
-                    await socket.send_json({"type": "run", "run": run})
+                if run != last_run or last_state is None:
+                    await socket.send_json(models.RunEvent(type="run", run=run).model_dump(mode="json"))
                     last_run = run
                 logs = session.logs.since(seq)
                 if logs:
-                    await socket.send_json({"type": "logs", "records": logs})
-                    seq = logs[-1]["seq"]
+                    await socket.send_json(models.LogsEvent(type="logs", records=logs).model_dump(mode="json"))
+                    seq = logs[-1].seq
                 await asyncio.sleep(EVENT_INTERVAL)
         except (fastapi.WebSocketDisconnect, RuntimeError):
             return
@@ -355,10 +315,28 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
     if (STATIC / "assets").is_dir():
         app.mount("/assets", fastapi.staticfiles.StaticFiles(directory=STATIC / "assets"), name="assets")
 
+    app.openapi = lambda: openapi_schema(app)  # type: ignore[method-assign]
     return app
 
 
-def list_dir(directory: pathlib.Path, patterns: Optional[str], hidden: bool) -> dict[str, Any]:
+def openapi_schema(app: fastapi.FastAPI) -> dict[str, Any]:
+    """The app's OpenAPI schema, with models.EXTRA_SCHEMAS added; the browser's types are
+    generated from it."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = fastapi.openapi.utils.get_openapi(title=app.title, version=app.version, routes=app.routes)
+    components = schema.setdefault("components", {}).setdefault("schemas", {})
+    adapter = pydantic.TypeAdapter(dict[str, Any])
+    for name, model in models.EXTRA_SCHEMAS.items():
+        definition = pydantic.TypeAdapter(model).json_schema(ref_template="#/components/schemas/{model}")
+        for sub_name, sub_schema in definition.pop("$defs", {}).items():
+            components.setdefault(sub_name, sub_schema)
+        components[name] = adapter.validate_python(definition)
+    app.openapi_schema = schema
+    return schema
+
+
+def list_dir(directory: pathlib.Path, patterns: Optional[str], hidden: bool) -> models.FileListing:
     """A directory's subdirectories and the files matching any of ``patterns`` (comma-separated globs)."""
     directory = directory.resolve()
     if not directory.is_dir():
@@ -379,10 +357,10 @@ def list_dir(directory: pathlib.Path, patterns: Optional[str], hidden: bool) -> 
             size = None if is_dir else child.stat().st_size
         except OSError:
             continue
-        entries.append({"name": child.name, "path": str(child), "isDir": is_dir, "size": size})
-    entries.sort(key=lambda e: (not e["isDir"], str(e["name"]).lower()))
-    return {
-        "path": str(directory),
-        "parent": str(directory.parent) if directory.parent != directory else None,
-        "entries": entries,
-    }
+        entries.append(models.FileEntry(name=child.name, path=str(child), isDir=is_dir, size=size))
+    entries.sort(key=lambda e: (not e.isDir, e.name.lower()))
+    return models.FileListing(
+        path=str(directory),
+        parent=str(directory.parent) if directory.parent != directory else None,
+        entries=entries,
+    )

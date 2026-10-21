@@ -17,9 +17,9 @@ async function newPipeline() {
 
 async function open() {
   if (!discardOk()) return
-  const paths = await chooseFiles({ title: 'Open a pipeline', mode: 'open', fileTypes: INI, initial: store.graph.config ?? undefined })
-  if (!paths) return
-  const graph = await attempt(() => api.loadConfig(paths[0]))
+  const [path] = (await chooseFiles({ title: 'Open a pipeline', mode: 'open', fileTypes: INI, initial: store.graph.config })) ?? []
+  if (path === undefined) return
+  const graph = await attempt(() => api.loadConfig(path))
   if (graph) {
     store.selectedId = null
     setGraph(graph)
@@ -27,13 +27,14 @@ async function open() {
 }
 
 async function save(as: boolean) {
-  let path = store.graph.config ?? undefined
-  if (as || !path) {
-    const paths = await chooseFiles({ title: 'Save the pipeline as', mode: 'save', fileTypes: INI, initial: path })
-    if (!paths) return
-    path = paths[0]
+  let path = store.graph.config
+  if (as || path === null) {
+    const [chosen] = (await chooseFiles({ title: 'Save the pipeline as', mode: 'save', fileTypes: INI, initial: path })) ?? []
+    if (chosen === undefined) return
+    path = chosen
   }
-  if ((await attempt(() => api.saveConfig(path))) !== undefined) await refreshGraph()
+  const target = path
+  if ((await attempt(() => api.saveConfig(target))) !== undefined) await refreshGraph()
 }
 
 async function tidy() {

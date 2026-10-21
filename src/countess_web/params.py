@@ -10,13 +10,14 @@ from __future__ import annotations
 import decimal
 import math
 from collections.abc import Sequence
-from typing import Any, Union
+from typing import Any, Literal, Optional, Union
 
 from countess.core.parameters import (
     ArrayParam,
     BaseParam,
     BooleanParam,
     ChoiceParam,
+    ColumnOrIntegerParam,
     ColumnOrStringParam,
     DecimalParam,
     DictChoiceParam,
@@ -30,109 +31,150 @@ from countess.core.parameters import (
     MultiParam,
     PerColumnArrayParam,
     ScalarParam,
+    StringCharacterSetParam,
+    StringParam,
     TabularMultiParam,
     TextParam,
 )
 from countess.core.plugins import BasePlugin
 from countess.core.workflow import FILENAME_FIELDS, RunContext, WorkflowError
 
-JsonValue = Union[None, bool, int, float, str, list, dict]
+from countess_web import models
 
 
 class ParameterError(ValueError):
     """A change the browser asked for that the parameter cannot take."""
 
 
-def describe_plugin(plugin: BasePlugin, context: RunContext) -> list[dict[str, Any]]:
-    """A plugin's parameters as JSON; ``context`` fills in output file name templates."""
+def describe_plugin(plugin: BasePlugin, context: RunContext) -> list[models.Param]:
+    """A plugin's parameters; ``context`` fills in save path templates."""
     return [describe(param, key, context) for key, param in plugin.params.items()]
 
 
 def describe(  # pylint: disable=too-many-return-statements
     param: BaseParam, path: str, context: RunContext
-) -> dict[str, Any]:
-    """One parameter (and those inside it) as JSON. ``kind`` says which widget draws it."""
+) -> models.Param:
+    """One parameter, and those inside it, as the model of its CountESS class family.
+
+    The order of the checks is CountESS's class hierarchy, most specific first: a TextParam is a
+    StringParam, a FileSaveParam a FileBaseParam, a ColumnOrIntegerParam a ColumnOrStringParam, and
+    a ColumnOrStringParam a ChoiceParam.
+    """
     common = {"path": path, "label": param.label, "hide": bool(param.hide), "readOnly": bool(param.read_only)}
 
     if isinstance(param, ArrayParam):
-        return common | describe_array(param, path, context)
+        return describe_array(param, path, context, common)
     if isinstance(param, MultiParam):
-        return common | {
-            "kind": "group",
-            "framed": isinstance(param, FramedMultiParam),
-            "children": [describe(p, f"{path}.{k}", context) for k, p in param.params.items()],
-        }
+        if isinstance(param, TabularMultiParam):
+            layout: Literal["plain", "table", "frame"] = "table"
+        elif isinstance(param, FramedMultiParam):
+            layout = "frame"
+        else:
+            layout = "plain"
+        children = [describe(p, f"{path}.{k}", context) for k, p in param.params.items()]
+        return models.GroupParamModel(kind="group", layout=layout, children=children, **common)
     if isinstance(param, BooleanParam):
-        return common | {"kind": "boolean", "value": bool(param.value)}
+        return models.BooleanParamModel(kind="boolean", value=param.value, **common)
     if isinstance(param, MultiChoiceParam):
-        return common | {"kind": "multichoice", "choices": list(param.choices), "value": list(param.get_values())}
+        chosen = param.get_values()
+        return models.MultiChoiceParamModel(
+            kind="multichoice", values=[c for c in param.choices if c in chosen], choices=list(param.choices), **common
+        )
     if isinstance(param, FileSaveParam):
-        return common | {"kind": "file", "mode": "save", **describe_save_path(param, context)}
+        return describe_save_path(param, context, common)
     if isinstance(param, FileBaseParam):
-        return common | {
-            "kind": "file",
-            "mode": "open",
-            "value": param.value or "",
-            "absolute": param.get_file_path() if param.value else "",
-            "fileTypes": file_types(param.file_types),
-        }
+        return models.FileParamModel(
+            kind="file",
+            value=param.value,
+            absolute=param.get_file_path() if param.value else None,
+            fileTypes=file_types(param.file_types),
+            **common,
+        )
     if isinstance(param, ColumnOrStringParam):
-        return common | {"kind": "combo", "choices": list(param.get_values()), "value": json_value(param.value)}
-    if isinstance(param, (ChoiceParam, DictChoiceParam)):
-        return common | {"kind": "choice", "choices": list(param.get_values()), "value": json_value(param.value)}
+        column = param.get_column_name()
+        prefix = len(ColumnOrStringParam.PREFIX)
+        return models.ColumnOrValueParamModel(
+            kind="column-or-value",
+            valueType="integer" if isinstance(param, ColumnOrIntegerParam) else "string",
+            value=None if column is not None else param.value,
+            column=column,
+            columns=[c[prefix:] for c in param.get_values()],
+            **common,
+        )
+    if isinstance(param, DictChoiceParam):
+        return models.ChoiceParamModel(
+            kind="choice",
+            selected=param.get_choice() or None,
+            options=[models.ChoiceOption(value=key, label=label) for key, label in param.choices.items()],
+            **common,
+        )
+    if isinstance(param, ChoiceParam):
+        return models.ChoiceParamModel(
+            kind="choice",
+            selected=param.value if param.value is not None else None,
+            options=[models.ChoiceOption(value=c, label=c) for c in param.get_values()],
+            **common,
+        )
     if isinstance(param, TextParam):
-        return common | {"kind": "text", "value": param.value or ""}
+        return models.TextParamModel(kind="text", value=param.value, **common)
+    if isinstance(param, StringParam):
+        character_set = sorted(param.character_set) if isinstance(param, StringCharacterSetParam) else None
+        return models.StringParamModel(kind="string", value=param.value, characterSet=character_set, **common)
     if isinstance(param, IntegerParam):
-        return common | {"kind": "integer", "value": json_value(param.value)}
-    if isinstance(param, (FloatParam, DecimalParam)):
-        return common | {"kind": "number", "value": json_value(param.value)}
-    if isinstance(param, ScalarParam):
-        return common | {"kind": "string", "value": json_value(param.value)}
-    raise TypeError(f"{path}: no description for {type(param).__name__}")
+        return models.IntegerParamModel(kind="integer", value=param.value, **common)
+    if isinstance(param, FloatParam):
+        return models.FloatParamModel(kind="float", value=finite_or_none(param.value), **common)
+    if isinstance(param, DecimalParam):
+        return models.DecimalParamModel(
+            kind="decimal", value=str(param.value) if param.value is not None else None, **common
+        )
+    raise TypeError(f"{path}: countess-web has no model for {type(param).__name__}")
 
 
-def describe_save_path(param: FileSaveParam, context: RunContext) -> dict[str, Any]:
+def finite_or_none(value: Optional[float]) -> Optional[float]:
+    # A FloatParam defaults to NaN in places (DataTypeChoiceParam's FLOAT); JSON has no NaN.
+    return value if value is not None and math.isfinite(value) else None
+
+
+def describe_save_path(param: FileSaveParam, context: RunContext, common: dict[str, Any]) -> models.SaveFileParamModel:
     """A save path, which may be a template: the file it names for a run starting now, or why it cannot."""
-    filled, error = "", ""
+    filled, error = None, None
     if param.value:
         try:
             filled = param.get_file_path_for(context)
         except WorkflowError as exc:
             error = str(exc)
-    return {
-        "value": param.value or "",
-        "absolute": filled,
-        "fileTypes": file_types(param.file_types),
-        "fields": list(FILENAME_FIELDS),
-        "templateError": error,
-    }
+    return models.SaveFileParamModel(
+        kind="save-file",
+        value=param.value,
+        filled=filled,
+        templateError=error,
+        fields=[models.FilenameField(name=n, description=d) for n, d in FILENAME_FIELDS.items()],
+        fileTypes=file_types(param.file_types),
+        **common,
+    )
 
 
-def describe_array(param: ArrayParam, path: str, context: RunContext) -> dict[str, Any]:
-    template = param.param
-    if isinstance(template, TabularMultiParam):
-        layout = "table"
-    elif isinstance(template, MultiParam):
-        layout = "frames"
-    else:
-        layout = "list"
+def describe_array(param: ArrayParam, path: str, context: RunContext, common: dict[str, Any]) -> models.ArrayParamModel:
     size = len(param.params)
     editable = not param.read_only
-    return {
-        "kind": "array",
-        "layout": layout,
-        "columns": [p.label for p in template.params.values()] if isinstance(template, MultiParam) else [],
-        "rowLabels": isinstance(param, PerColumnArrayParam),
-        "rows": [describe(p, f"{path}.{n}", context) for n, p in enumerate(param.params)],
-        "canAdd": editable and (param.max_size is None or size < param.max_size),
-        "canDelete": editable and size > param.min_size,
-        "addFiles": isinstance(param, FileArrayParam),
-        "fileTypes": file_types(param.file_types) if isinstance(param, FileArrayParam) else [],
-        "itemLabel": template.label,
-    }
+    return models.ArrayParamModel(
+        kind="array",
+        items=[describe(p, f"{path}.{n}", context) for n, p in enumerate(param.params)],
+        # The template is not itself saved; its path names where a new row will be.
+        template=describe(param.param, f"{path}.{size}", context),
+        minSize=param.min_size,
+        maxSize=param.max_size,
+        perColumn=isinstance(param, PerColumnArrayParam),
+        files=isinstance(param, FileArrayParam),
+        fileTypes=file_types(param.file_types) if isinstance(param, FileArrayParam) else [],
+        canAdd=editable and (param.max_size is None or size < param.max_size),
+        canDelete=editable and size > param.min_size,
+        **common,
+    )
 
 
-def file_types(types: Sequence[tuple[str, Union[str, list[str]]]]) -> list[dict[str, Any]]:
+def file_types(types: Sequence[tuple[str, Union[str, list[str]]]]) -> list[models.FileType]:
     """A parameter's file types with glob patterns, and "All files" last.
 
     Plugins write them for Tk's file dialogs, which take either a glob (``*.fa``) or a bare
@@ -141,16 +183,10 @@ def file_types(types: Sequence[tuple[str, Union[str, list[str]]]]) -> list[dict[
     described = []
     for label, patterns in types:
         globs = [patterns] if isinstance(patterns, str) else list(patterns)
-        described.append({"label": label, "patterns": [f"*{g}" if g.startswith(".") else g for g in globs]})
-    if not any(t["patterns"] == ["*"] for t in described):
-        described.append({"label": "All files", "patterns": ["*"]})
+        described.append(models.FileType(label=label, patterns=[f"*{g}" if g.startswith(".") else g for g in globs]))
+    if not any(t.patterns == ["*"] for t in described):
+        described.append(models.FileType(label="All files", patterns=["*"]))
     return described
-
-
-def json_value(value: Any) -> JsonValue:
-    if isinstance(value, decimal.Decimal):
-        return str(value)
-    return value
 
 
 def output_files(plugin: BasePlugin, context: RunContext) -> list[tuple[str, str, str]]:
@@ -214,7 +250,16 @@ def set_value(plugin: BasePlugin, path: str, value: Any) -> None:
     elif isinstance(param, MultiChoiceParam):
         if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
             raise ParameterError(f"{path} takes a list of choices")
+        # MultiChoiceParam.set_value would add an unknown value to the choices; refuse it instead.
+        unknown = [v for v in value if v not in param.choices]
+        if unknown:
+            raise ParameterError(f"{path} has no choice {', '.join(map(repr, unknown))}")
         param.set_values(value)
+    elif isinstance(param, ColumnOrStringParam) and isinstance(value, str) and value.startswith(param.PREFIX):
+        # A value spelt like a column reference would be read as one; columns are chosen by name.
+        raise ParameterError(f"{path}: choose a column with 'column', not a value starting {param.PREFIX!r}")
+    elif isinstance(param, DictChoiceParam) and value not in param.choices:
+        raise ParameterError(f"{path} has no option {value!r}")
     elif isinstance(param, ScalarParam):
         if value is not None and not isinstance(value, (str, int, float)):
             raise ParameterError(f"{path} takes a single value")
@@ -231,6 +276,23 @@ def set_value(plugin: BasePlugin, path: str, value: Any) -> None:
             raise ParameterError(f"{path} takes a finite number")
     else:
         raise ParameterError(f"{path} is not a single value")
+
+
+def set_column(plugin: BasePlugin, path: str, column: str) -> None:
+    """Sets a column-or-value parameter to take each row's value from ``column``.
+
+    Raises:
+        ParameterError: If the parameter takes no column, or the input has no such column.
+    """
+    param = resolve(plugin, path)
+    if not isinstance(param, ColumnOrStringParam):
+        raise ParameterError(f"{path} does not take a column")
+    if param.read_only:
+        raise ParameterError(f"{path} is read-only")
+    reference = param.PREFIX + column
+    if reference not in param.get_values():
+        raise ParameterError(f"{path}: the input has no column {column!r}")
+    param.value = reference
 
 
 def add_row(plugin: BasePlugin, path: str) -> None:

@@ -1,0 +1,3164 @@
+{
+  "components": {
+    "schemas": {
+      "ArrayParamModel": {
+        "additionalProperties": false,
+        "description": "ArrayParam: rows copied from ``template``. A PerColumnArrayParam has a row per input column,\neach labelled with it, and none can be added or removed; a FileArrayParam's rows are files,\nadded by choosing them.",
+        "properties": {
+          "canAdd": {
+            "title": "Canadd",
+            "type": "boolean"
+          },
+          "canDelete": {
+            "title": "Candelete",
+            "type": "boolean"
+          },
+          "fileTypes": {
+            "items": {
+              "$ref": "#/components/schemas/FileType"
+            },
+            "title": "Filetypes",
+            "type": "array"
+          },
+          "files": {
+            "title": "Files",
+            "type": "boolean"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/components/schemas/ArrayParamModel",
+                  "boolean": "#/components/schemas/BooleanParamModel",
+                  "choice": "#/components/schemas/ChoiceParamModel",
+                  "column-or-value": "#/components/schemas/ColumnOrValueParamModel",
+                  "decimal": "#/components/schemas/DecimalParamModel",
+                  "file": "#/components/schemas/FileParamModel",
+                  "float": "#/components/schemas/FloatParamModel",
+                  "group": "#/components/schemas/GroupParamModel",
+                  "integer": "#/components/schemas/IntegerParamModel",
+                  "multichoice": "#/components/schemas/MultiChoiceParamModel",
+                  "save-file": "#/components/schemas/SaveFileParamModel",
+                  "string": "#/components/schemas/StringParamModel",
+                  "text": "#/components/schemas/TextParamModel"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/BooleanParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/StringParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/TextParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/IntegerParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/FloatParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/DecimalParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/ChoiceParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/ColumnOrValueParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/MultiChoiceParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/FileParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/SaveFileParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/ArrayParamModel"
+                }
+              ]
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "const": "array",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "maxSize": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxsize"
+          },
+          "minSize": {
+            "title": "Minsize",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "perColumn": {
+            "title": "Percolumn",
+            "type": "boolean"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "template": {
+            "discriminator": {
+              "mapping": {
+                "array": "#/components/schemas/ArrayParamModel",
+                "boolean": "#/components/schemas/BooleanParamModel",
+                "choice": "#/components/schemas/ChoiceParamModel",
+                "column-or-value": "#/components/schemas/ColumnOrValueParamModel",
+                "decimal": "#/components/schemas/DecimalParamModel",
+                "file": "#/components/schemas/FileParamModel",
+                "float": "#/components/schemas/FloatParamModel",
+                "group": "#/components/schemas/GroupParamModel",
+                "integer": "#/components/schemas/IntegerParamModel",
+                "multichoice": "#/components/schemas/MultiChoiceParamModel",
+                "save-file": "#/components/schemas/SaveFileParamModel",
+                "string": "#/components/schemas/StringParamModel",
+                "text": "#/components/schemas/TextParamModel"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BooleanParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/StringParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/TextParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/IntegerParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/FloatParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/DecimalParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/ChoiceParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/ColumnOrValueParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/MultiChoiceParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/FileParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/SaveFileParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/GroupParamModel"
+              },
+              {
+                "$ref": "#/components/schemas/ArrayParamModel"
+              }
+            ],
+            "title": "Template"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "items",
+          "template",
+          "minSize",
+          "maxSize",
+          "perColumn",
+          "files",
+          "fileTypes",
+          "canAdd",
+          "canDelete"
+        ],
+        "title": "ArrayParamModel",
+        "type": "object"
+      },
+      "BooleanParamModel": {
+        "additionalProperties": false,
+        "description": "BooleanParam. None is a parameter never set, which CountESS reads (and the GUI shows) as false.",
+        "properties": {
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "boolean",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value"
+        ],
+        "title": "BooleanParamModel",
+        "type": "object"
+      },
+      "ChoiceOption": {
+        "additionalProperties": false,
+        "description": "``value`` is what is sent to choose it and what a pipeline saves; ``label`` is what is shown.\nThey differ only for a DictChoiceParam.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "ChoiceOption",
+        "type": "object"
+      },
+      "ChoiceParamModel": {
+        "additionalProperties": false,
+        "description": "ChoiceParam and its family (column choices, data types), and DictChoiceParam. ``selected`` is\nthe value chosen, which may be one no longer among the options (a column that has gone).",
+        "properties": {
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "choice",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ChoiceOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "selected",
+          "options"
+        ],
+        "title": "ChoiceParamModel",
+        "type": "object"
+      },
+      "Column": {
+        "additionalProperties": false,
+        "description": "A column of a node's table: its name, and its DuckDB type as DuckDB writes it.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "Column",
+        "type": "object"
+      },
+      "ColumnOrValueParamModel": {
+        "additionalProperties": false,
+        "description": "ColumnOrStringParam and ColumnOrIntegerParam: either a value typed in, or a column of the input\nto take each row's value from. Exactly one of ``value`` and ``column`` is set, or neither.",
+        "properties": {
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "column-or-value",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "valueType": {
+            "enum": [
+              "string",
+              "integer"
+            ],
+            "title": "Valuetype",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "valueType",
+          "value",
+          "column",
+          "columns"
+        ],
+        "title": "ColumnOrValueParamModel",
+        "type": "object"
+      },
+      "ConfigPath": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          }
+        },
+        "title": "ConfigPath",
+        "type": "object"
+      },
+      "DecimalParamModel": {
+        "additionalProperties": false,
+        "description": "DecimalParam, its value as exact decimal text.",
+        "properties": {
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "decimal",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value"
+        ],
+        "title": "DecimalParamModel",
+        "type": "object"
+      },
+      "Deleted": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "Deleted",
+        "type": "object"
+      },
+      "DownloadLink": {
+        "additionalProperties": false,
+        "description": "A link that downloads one file, once, within a minute. ``rows`` is a preview's row count.",
+        "properties": {
+          "rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "DownloadLink",
+        "type": "object"
+      },
+      "Edge": {
+        "additionalProperties": false,
+        "properties": {
+          "child": {
+            "title": "Child",
+            "type": "string"
+          },
+          "parent": {
+            "title": "Parent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent",
+          "child"
+        ],
+        "title": "Edge",
+        "type": "object"
+      },
+      "EventHello": {
+        "additionalProperties": false,
+        "description": "The first message the browser sends on the event socket.",
+        "properties": {
+          "since": {
+            "default": 0,
+            "title": "Since",
+            "type": "integer"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "EventHello",
+        "type": "object"
+      },
+      "FileEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "isDir": {
+            "title": "Isdir",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "isDir",
+          "size"
+        ],
+        "title": "FileEntry",
+        "type": "object"
+      },
+      "FileListing": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "entries"
+        ],
+        "title": "FileListing",
+        "type": "object"
+      },
+      "FileParamModel": {
+        "additionalProperties": false,
+        "description": "FileParam: a file to read. ``absolute`` is it resolved against the pipeline's folder.",
+        "properties": {
+          "absolute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absolute"
+          },
+          "fileTypes": {
+            "items": {
+              "$ref": "#/components/schemas/FileType"
+            },
+            "title": "Filetypes",
+            "type": "array"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "file",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value",
+          "absolute",
+          "fileTypes"
+        ],
+        "title": "FileParamModel",
+        "type": "object"
+      },
+      "FileType": {
+        "additionalProperties": false,
+        "description": "One entry of a file parameter's ``file_types``, its patterns as globs.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Patterns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "label",
+          "patterns"
+        ],
+        "title": "FileType",
+        "type": "object"
+      },
+      "FilenameField": {
+        "additionalProperties": false,
+        "description": "A field a save path template can use (countess.core.workflow.FILENAME_FIELDS).",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "FilenameField",
+        "type": "object"
+      },
+      "FloatParamModel": {
+        "additionalProperties": false,
+        "description": "FloatParam. None is an empty value.",
+        "properties": {
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "float",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value"
+        ],
+        "title": "FloatParamModel",
+        "type": "object"
+      },
+      "Graph": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "modified": {
+            "title": "Modified",
+            "type": "boolean"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "workflow": {
+            "$ref": "#/components/schemas/Workflow"
+          }
+        },
+        "required": [
+          "version",
+          "workflow",
+          "config",
+          "modified",
+          "nodes"
+        ],
+        "title": "Graph",
+        "type": "object"
+      },
+      "GroupParamModel": {
+        "additionalProperties": false,
+        "description": "MultiParam. ``layout`` is CountESS's hint for drawing it: TabularMultiParam is a table row,\nFramedMultiParam a frame of its own.",
+        "properties": {
+          "children": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/components/schemas/ArrayParamModel",
+                  "boolean": "#/components/schemas/BooleanParamModel",
+                  "choice": "#/components/schemas/ChoiceParamModel",
+                  "column-or-value": "#/components/schemas/ColumnOrValueParamModel",
+                  "decimal": "#/components/schemas/DecimalParamModel",
+                  "file": "#/components/schemas/FileParamModel",
+                  "float": "#/components/schemas/FloatParamModel",
+                  "group": "#/components/schemas/GroupParamModel",
+                  "integer": "#/components/schemas/IntegerParamModel",
+                  "multichoice": "#/components/schemas/MultiChoiceParamModel",
+                  "save-file": "#/components/schemas/SaveFileParamModel",
+                  "string": "#/components/schemas/StringParamModel",
+                  "text": "#/components/schemas/TextParamModel"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/BooleanParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/StringParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/TextParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/IntegerParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/FloatParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/DecimalParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/ChoiceParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/ColumnOrValueParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/MultiChoiceParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/FileParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/SaveFileParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupParamModel"
+                },
+                {
+                  "$ref": "#/components/schemas/ArrayParamModel"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "group",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "layout": {
+            "enum": [
+              "plain",
+              "table",
+              "frame"
+            ],
+            "title": "Layout",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "layout",
+          "children"
+        ],
+        "title": "GroupParamModel",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IntegerParamModel": {
+        "additionalProperties": false,
+        "description": "IntegerParam. None is an empty value.",
+        "properties": {
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "integer",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value"
+        ],
+        "title": "IntegerParamModel",
+        "type": "object"
+      },
+      "LogRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "time",
+          "level",
+          "source",
+          "message"
+        ],
+        "title": "LogRecord",
+        "type": "object"
+      },
+      "LogsEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/LogRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "type": {
+            "const": "logs",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "records"
+        ],
+        "title": "LogsEvent",
+        "type": "object"
+      },
+      "MultiChoiceParamModel": {
+        "additionalProperties": false,
+        "description": "MultiChoiceParam (MultiColumnChoiceParam): any number of ``choices``, in their order.",
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "multichoice",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "values",
+          "choices"
+        ],
+        "title": "MultiChoiceParamModel",
+        "type": "object"
+      },
+      "Node": {
+        "additionalProperties": false,
+        "description": "A PipelineNode. ``position`` is CountESS's (across, down), each from 0 to 1. ``message`` is the\ntraceback of a failed preview, empty for a node that made no table without failing (a CSV Save,\nsay). ``sortColumn`` and ``sortDescending`` are the preview's sort, which a pipeline saves.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Parents",
+            "type": "array"
+          },
+          "plugin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePlugin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Position",
+            "type": "array"
+          },
+          "sortColumn": {
+            "title": "Sortcolumn",
+            "type": "integer"
+          },
+          "sortDescending": {
+            "title": "Sortdescending",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "DIRTY",
+              "WORKING",
+              "RESULT",
+              "ERROR"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "position",
+          "notes",
+          "status",
+          "message",
+          "parents",
+          "sortColumn",
+          "sortDescending",
+          "plugin"
+        ],
+        "title": "Node",
+        "type": "object"
+      },
+      "NodeCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "plugin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin"
+          },
+          "position": {
+            "default": [
+              0.5,
+              0.5
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Position",
+            "type": "array"
+          }
+        },
+        "title": "NodeCreate",
+        "type": "object"
+      },
+      "NodePlugin": {
+        "additionalProperties": false,
+        "description": "A node's plugin (BasePlugin): its class's attributes.",
+        "properties": {
+          "additional": {
+            "title": "Additional",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "numInputs": {
+            "title": "Numinputs",
+            "type": "integer"
+          },
+          "numOutputs": {
+            "title": "Numoutputs",
+            "type": "integer"
+          },
+          "showPreview": {
+            "title": "Showpreview",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "description",
+          "numInputs",
+          "numOutputs",
+          "version",
+          "additional",
+          "link",
+          "showPreview"
+        ],
+        "title": "NodePlugin",
+        "type": "object"
+      },
+      "NodeState": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DIRTY",
+              "WORKING",
+              "RESULT",
+              "ERROR"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "NodeState",
+        "type": "object"
+      },
+      "NodeUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "sortColumn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortcolumn"
+          },
+          "sortDescending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortdescending"
+          }
+        },
+        "title": "NodeUpdate",
+        "type": "object"
+      },
+      "Param": {
+        "discriminator": {
+          "mapping": {
+            "array": "#/components/schemas/ArrayParamModel",
+            "boolean": "#/components/schemas/BooleanParamModel",
+            "choice": "#/components/schemas/ChoiceParamModel",
+            "column-or-value": "#/components/schemas/ColumnOrValueParamModel",
+            "decimal": "#/components/schemas/DecimalParamModel",
+            "file": "#/components/schemas/FileParamModel",
+            "float": "#/components/schemas/FloatParamModel",
+            "group": "#/components/schemas/GroupParamModel",
+            "integer": "#/components/schemas/IntegerParamModel",
+            "multichoice": "#/components/schemas/MultiChoiceParamModel",
+            "save-file": "#/components/schemas/SaveFileParamModel",
+            "string": "#/components/schemas/StringParamModel",
+            "text": "#/components/schemas/TextParamModel"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BooleanParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/StringParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/TextParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/IntegerParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/FloatParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/DecimalParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/ChoiceParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/ColumnOrValueParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/MultiChoiceParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/FileParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/SaveFileParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/GroupParamModel"
+          },
+          {
+            "$ref": "#/components/schemas/ArrayParamModel"
+          }
+        ]
+      },
+      "ParameterChange": {
+        "additionalProperties": false,
+        "description": "A change to the parameter at ``path``: a new ``value``, or for a column-or-value parameter a\n``column`` to take it from; or adding a row to a list, adding files to a file list, or deleting\nrow ``index``.",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "enum": [
+                  "add",
+                  "addFiles",
+                  "delete"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "paths": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paths"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ParameterChange",
+        "type": "object"
+      },
+      "PluginChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "plugin": {
+            "title": "Plugin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin"
+        ],
+        "title": "PluginChoice",
+        "type": "object"
+      },
+      "PluginInfo": {
+        "additionalProperties": false,
+        "description": "A plugin class from the countess_plugins entry points, by ``module:Class``.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "numInputs": {
+            "title": "Numinputs",
+            "type": "integer"
+          },
+          "numOutputs": {
+            "title": "Numoutputs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "description",
+          "numInputs",
+          "numOutputs"
+        ],
+        "title": "PluginInfo",
+        "type": "object"
+      },
+      "Preview": {
+        "additionalProperties": false,
+        "description": "Rows ``offset`` on of a node's preview table. Each cell is its DuckDB value as JSON: a number,\ntext, true or false, null, or a list or object for a nested type. Sent as exact text: a DECIMAL,\nan integer a browser cannot hold exactly (beyond 2**53, as a BIGINT or HUGEINT can be), a time\nwith a time zone, an infinite or not-a-number float, and other values JSON lacks.",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "DIRTY",
+              "WORKING",
+              "RESULT",
+              "ERROR"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "columns",
+          "rows",
+          "total"
+        ],
+        "title": "Preview",
+        "type": "object"
+      },
+      "RunEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "run",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "run"
+        ],
+        "title": "RunEvent",
+        "type": "object"
+      },
+      "RunOutput": {
+        "additionalProperties": false,
+        "description": "A file a save node was set to write when the run started; ``written`` if this run wrote it.\n``error`` is why its template named no file.",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "parameter": {
+            "title": "Parameter",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "written": {
+            "title": "Written",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "index",
+          "node",
+          "parameter",
+          "file",
+          "name",
+          "size",
+          "written",
+          "error"
+        ],
+        "title": "RunOutput",
+        "type": "object"
+      },
+      "RunSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "title": "Config",
+            "type": "string"
+          },
+          "finished": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "returncode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returncode"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started": {
+            "title": "Started",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "config",
+          "started",
+          "finished",
+          "returncode",
+          "running"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "SaveFileParamModel": {
+        "additionalProperties": false,
+        "description": "FileSaveParam: a file to write, possibly a template naming it from the run. ``filled`` is the\nfile it names for a run starting now, or ``templateError`` why it names none.",
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FilenameField"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "fileTypes": {
+            "items": {
+              "$ref": "#/components/schemas/FileType"
+            },
+            "title": "Filetypes",
+            "type": "array"
+          },
+          "filled": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "save-file",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "templateError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Templateerror"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value",
+          "filled",
+          "templateError",
+          "fields",
+          "fileTypes"
+        ],
+        "title": "SaveFileParamModel",
+        "type": "object"
+      },
+      "SavedConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "SavedConfig",
+        "type": "object"
+      },
+      "ServerEvent": {
+        "discriminator": {
+          "mapping": {
+            "logs": "#/components/schemas/LogsEvent",
+            "run": "#/components/schemas/RunEvent",
+            "state": "#/components/schemas/StateEvent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StateEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RunEvent"
+          },
+          {
+            "$ref": "#/components/schemas/LogsEvent"
+          }
+        ]
+      },
+      "StateEvent": {
+        "additionalProperties": false,
+        "description": "Sent when any node's status, or the graph's version or modified flag, changes. A new\n``version`` means the graph itself changed and should be fetched again.",
+        "properties": {
+          "modified": {
+            "title": "Modified",
+            "type": "boolean"
+          },
+          "nodes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NodeState"
+            },
+            "title": "Nodes",
+            "type": "object"
+          },
+          "type": {
+            "const": "state",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "version",
+          "modified",
+          "nodes"
+        ],
+        "title": "StateEvent",
+        "type": "object"
+      },
+      "Stopping": {
+        "additionalProperties": false,
+        "properties": {
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopping"
+        ],
+        "title": "Stopping",
+        "type": "object"
+      },
+      "StringParamModel": {
+        "additionalProperties": false,
+        "description": "StringParam (ColumnLabelParam, StringCharacterSetParam). ``characterSet``, when set, is every\ncharacter the value may hold; CountESS uppercases a lowercase letter it allows only in upper case,\nand drops any other character.",
+        "properties": {
+          "characterSet": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Characterset"
+          },
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "string",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value"
+        ],
+        "title": "StringParamModel",
+        "type": "object"
+      },
+      "TextParamModel": {
+        "additionalProperties": false,
+        "description": "TextParam: a long, multi-line string.",
+        "properties": {
+          "hide": {
+            "title": "Hide",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "text",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "hide",
+          "readOnly",
+          "kind",
+          "value"
+        ],
+        "title": "TextParamModel",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Workflow": {
+        "additionalProperties": false,
+        "description": "countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "Workflow",
+        "type": "object"
+      },
+      "WorkflowUpdate": {
+        "additionalProperties": false,
+        "description": "An empty string unsets the name or version.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "WorkflowUpdate",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "CountESS",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/config/load": {
+      "post": {
+        "operationId": "config_load_api_config_load_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPath"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Graph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Config Load"
+      }
+    },
+    "/api/config/new": {
+      "post": {
+        "operationId": "config_new_api_config_new_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Graph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Config New"
+      }
+    },
+    "/api/config/save": {
+      "post": {
+        "operationId": "config_save_api_config_save_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPath"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedConfig"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Config Save"
+      }
+    },
+    "/api/edges": {
+      "delete": {
+        "operationId": "edge_delete_api_edges_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "parent",
+            "required": true,
+            "schema": {
+              "title": "Parent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "child",
+            "required": true,
+            "schema": {
+              "title": "Child",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Edge"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edge Delete"
+      },
+      "post": {
+        "operationId": "edge_create_api_edges_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Edge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Edge"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edge Create"
+      }
+    },
+    "/api/files": {
+      "get": {
+        "operationId": "files_api_files_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          },
+          {
+            "in": "query",
+            "name": "patterns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patterns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hidden",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Hidden",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListing"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Files"
+      }
+    },
+    "/api/graph": {
+      "get": {
+        "operationId": "graph_api_graph_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Graph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Graph"
+      }
+    },
+    "/api/graph/tidy": {
+      "post": {
+        "operationId": "tidy_api_graph_tidy_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Graph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tidy"
+      }
+    },
+    "/api/nodes": {
+      "post": {
+        "operationId": "node_create_api_nodes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Node Create"
+      }
+    },
+    "/api/nodes/{node_id}": {
+      "delete": {
+        "operationId": "node_delete_api_nodes__node_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Node Delete"
+      },
+      "patch": {
+        "operationId": "node_update_api_nodes__node_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Node Update"
+      }
+    },
+    "/api/nodes/{node_id}/parameters": {
+      "get": {
+        "operationId": "parameters_api_nodes__node_id__parameters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "discriminator": {
+                      "mapping": {
+                        "array": "#/components/schemas/ArrayParamModel",
+                        "boolean": "#/components/schemas/BooleanParamModel",
+                        "choice": "#/components/schemas/ChoiceParamModel",
+                        "column-or-value": "#/components/schemas/ColumnOrValueParamModel",
+                        "decimal": "#/components/schemas/DecimalParamModel",
+                        "file": "#/components/schemas/FileParamModel",
+                        "float": "#/components/schemas/FloatParamModel",
+                        "group": "#/components/schemas/GroupParamModel",
+                        "integer": "#/components/schemas/IntegerParamModel",
+                        "multichoice": "#/components/schemas/MultiChoiceParamModel",
+                        "save-file": "#/components/schemas/SaveFileParamModel",
+                        "string": "#/components/schemas/StringParamModel",
+                        "text": "#/components/schemas/TextParamModel"
+                      },
+                      "propertyName": "kind"
+                    },
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/BooleanParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/StringParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TextParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/IntegerParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/FloatParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/DecimalParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ChoiceParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ColumnOrValueParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/MultiChoiceParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/FileParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SaveFileParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/GroupParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ArrayParamModel"
+                      }
+                    ]
+                  },
+                  "title": "Response Parameters Api Nodes  Node Id  Parameters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parameters"
+      },
+      "post": {
+        "operationId": "parameter_change_api_nodes__node_id__parameters_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "discriminator": {
+                      "mapping": {
+                        "array": "#/components/schemas/ArrayParamModel",
+                        "boolean": "#/components/schemas/BooleanParamModel",
+                        "choice": "#/components/schemas/ChoiceParamModel",
+                        "column-or-value": "#/components/schemas/ColumnOrValueParamModel",
+                        "decimal": "#/components/schemas/DecimalParamModel",
+                        "file": "#/components/schemas/FileParamModel",
+                        "float": "#/components/schemas/FloatParamModel",
+                        "group": "#/components/schemas/GroupParamModel",
+                        "integer": "#/components/schemas/IntegerParamModel",
+                        "multichoice": "#/components/schemas/MultiChoiceParamModel",
+                        "save-file": "#/components/schemas/SaveFileParamModel",
+                        "string": "#/components/schemas/StringParamModel",
+                        "text": "#/components/schemas/TextParamModel"
+                      },
+                      "propertyName": "kind"
+                    },
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/BooleanParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/StringParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TextParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/IntegerParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/FloatParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/DecimalParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ChoiceParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ColumnOrValueParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/MultiChoiceParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/FileParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SaveFileParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/GroupParamModel"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ArrayParamModel"
+                      }
+                    ]
+                  },
+                  "title": "Response Parameter Change Api Nodes  Node Id  Parameters Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parameter Change"
+      }
+    },
+    "/api/nodes/{node_id}/plugin": {
+      "post": {
+        "operationId": "node_plugin_api_nodes__node_id__plugin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Node Plugin"
+      }
+    },
+    "/api/nodes/{node_id}/preview": {
+      "get": {
+        "operationId": "preview_api_nodes__node_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview"
+      }
+    },
+    "/api/nodes/{node_id}/preview/download": {
+      "post": {
+        "operationId": "preview_download_api_nodes__node_id__preview_download_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadLink"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Download"
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "operationId": "plugins_api_plugins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PluginInfo"
+                  },
+                  "title": "Response Plugins Api Plugins Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Plugins"
+      }
+    },
+    "/api/run": {
+      "get": {
+        "operationId": "run_state_api_run_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RunSummary"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Run State Api Run Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run State"
+      },
+      "post": {
+        "operationId": "run_start_api_run_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run Start"
+      }
+    },
+    "/api/run/log/download": {
+      "post": {
+        "operationId": "run_log_download_api_run_log_download_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadLink"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run Log Download"
+      }
+    },
+    "/api/run/outputs": {
+      "get": {
+        "operationId": "run_outputs_api_run_outputs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunOutput"
+                  },
+                  "title": "Response Run Outputs Api Run Outputs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run Outputs"
+      }
+    },
+    "/api/run/outputs/{index}/download": {
+      "post": {
+        "operationId": "run_output_download_api_run_outputs__index__download_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "title": "Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadLink"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Output Download"
+      }
+    },
+    "/api/run/stop": {
+      "post": {
+        "operationId": "run_stop_api_run_stop_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stopping"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run Stop"
+      }
+    },
+    "/api/workflow": {
+      "patch": {
+        "operationId": "workflow_api_workflow_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Graph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Workflow"
+      }
+    }
+  }
+}

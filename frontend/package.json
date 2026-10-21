@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "generate:api": "openapi-typescript openapi.json -o src/api-schema.ts",
+    "check:api": "node scripts/check-api.mjs",
+    "lint": "eslint .",
     "typecheck": "vue-tsc --noEmit",
+    "build": "npm run check:api && vue-tsc --noEmit && vite build",
     "test": "vitest run"
   },
   "dependencies": {
@@ -18,10 +21,15 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",
     "@vue/test-utils": "^2.4.0",
+    "eslint": "^10.12.0",
+    "eslint-plugin-vue": "^10.11.1",
     "jsdom": "*",
+    "openapi-typescript": "^7.13.0",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2",
     "vite": "^8.0.0",
     "vitest": "*",
+    "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.0.0"
   }
 }

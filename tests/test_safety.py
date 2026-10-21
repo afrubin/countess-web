@@ -71,7 +71,7 @@ def test_the_event_socket_sends_the_pipelines_state_once_given_the_token(session
     client = fastapi.testclient.TestClient(create_app(session, TOKEN))
 
     with client.websocket_connect("/api/events") as socket:
-        socket.send_json({"token": TOKEN, "since": "not a number"})
+        socket.send_json({"token": TOKEN})
         first = socket.receive_json()
 
     assert first["type"] == "state"
@@ -262,10 +262,11 @@ def test_a_save_path_is_described_with_the_file_it_names_now(
 
     filename = {p["path"]: p for p in client.get(f"/api/nodes/{node}/parameters").json()}["filename"]
 
+    assert filename["kind"] == "save-file"
     assert filename["value"] == "{date}_{workflow}_{version}_{node}.csv"
-    assert filename["absolute"].startswith(str(workdir))
-    assert filename["absolute"].endswith("_fwd-test_v1-2-0_csv-save.csv")
-    assert "node" in filename["fields"]
+    assert filename["filled"].startswith(str(workdir))
+    assert filename["filled"].endswith("_fwd-test_v1-2-0_csv-save.csv")
+    assert "node" in [field["name"] for field in filename["fields"]]
 
 
 def test_a_save_path_template_that_cannot_be_filled_says_why(
@@ -277,5 +278,20 @@ def test_a_save_path_template_that_cannot_be_filled_says_why(
     described = client.post(f"/api/nodes/{node}/parameters", json={"path": "filename", "value": "{nope}.csv"}).json()
 
     filename = {p["path"]: p for p in described}["filename"]
-    assert filename["absolute"] == ""
+    assert filename["filled"] is None
     assert "unknown field {nope}" in filename["templateError"]
+
+
+def test_an_integer_a_browser_cannot_hold_exactly_is_previewed_as_text(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    (workdir / "big.csv").write_text("name,count\nsmall,9007199254740991\nbig,9007199254740993\n")
+    node = add_plugin_node(client, "countess.plugins.csv:LoadCsvPlugin")
+    client.post(
+        f"/api/nodes/{node}/parameters",
+        json={"path": "files", "action": "addFiles", "paths": [str(workdir / "big.csv")]},
+    )
+
+    rows = preview_rows(client, node)
+
+    assert rows == [["big", "9007199254740993"], ["small", 9007199254740991]]

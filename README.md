@@ -127,8 +127,29 @@ pytest
 cd frontend
 npm ci
 npm test
-npm run build      # type-checks, then builds into ../src/countess_web/static
+npm run lint
+npm run build      # checks the generated API types, type-checks, then builds into ../src/countess_web/static
 ```
+
+### The API's types
+
+The browser's types are generated from the server, not written twice. `countess_web/models.py` declares every shape
+the API sends and accepts, each parameter kind following one family of CountESS's parameter classes with its value
+typed as CountESS holds it. FastAPI publishes those models as an OpenAPI schema, committed as
+`frontend/openapi.json`, and `openapi-typescript` turns that into `frontend/src/api-schema.ts`, which
+`frontend/src/types.ts` names for use. After changing a model or a route:
+
+```shell
+python -m countess_web.schema frontend/openapi.json
+cd frontend && npm run generate:api
+```
+
+Neither file can fall behind unnoticed: `tests/test_schema.py` fails if `openapi.json` is not the server's schema, and
+`npm run build` (through `npm run check:api`) fails if `api-schema.ts` is not what `openapi.json` generates. A model
+change that the page does not follow then fails the page's type-check.
+
+`npm run lint` runs ESLint with typescript-eslint's strict, type-checked rules; the compiler runs with `strict`,
+`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.
 
 For working on the page with hot reload, run the server with a fixed token and Vite's dev server alongside it, then
 open `http://localhost:5173/?token=dev`:

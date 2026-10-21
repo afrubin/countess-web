@@ -59,9 +59,11 @@ def settled(client: fastapi.testclient.TestClient) -> dict[str, Any]:
     raise AssertionError(f"the preview did not settle in {SETTLE_SECONDS}s")
 
 
-def preview_rows(client: fastapi.testclient.TestClient, node_id: str, **query: Any) -> list[list[Any]]:
+def preview_rows(
+    client: fastapi.testclient.TestClient, node_id: str, offset: int = 0, limit: int = 100
+) -> list[list[Any]]:
     settled(client)
-    response = client.get(f"/api/nodes/{node_id}/preview", params=query)
+    response = client.get(f"/api/nodes/{node_id}/preview", params={"offset": offset, "limit": limit})
     assert response.status_code == 200, response.text
     return response.json()["rows"]
 

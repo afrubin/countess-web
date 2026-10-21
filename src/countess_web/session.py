@@ -34,6 +34,7 @@ from countess.core.plugins import BasePlugin
 from countess.core.workflow import RunContext, WorkflowError, WorkflowInfo, default_filename
 from countess.utils.duckdb import duckdb_escape_identifier
 
+from countess_web import models
 from countess_web import params
 from countess_web import resources
 
@@ -73,15 +74,15 @@ class RunState:
     finished: Optional[str] = None
     returncode: Optional[int] = None
 
-    def summary(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "config": self.config,
-            "started": self.started,
-            "finished": self.finished,
-            "returncode": self.returncode,
-            "running": self.returncode is None,
-        }
+    def summary(self) -> models.RunSummary:
+        return models.RunSummary(
+            id=self.id,
+            config=self.config,
+            started=self.started,
+            finished=self.finished,
+            returncode=self.returncode,
+            running=self.returncode is None,
+        )
 
 
 class LogBuffer(logging.Handler):
@@ -99,18 +100,18 @@ class LogBuffer(logging.Handler):
     def add(self, level: str, source: str, message: str) -> None:
         with self.lock_:
             self.records.append(
-                {
-                    "seq": next(self.counter),
-                    "time": datetime.datetime.now().isoformat(timespec="seconds"),
-                    "level": level,
-                    "source": source,
-                    "message": message,
-                }
+                models.LogRecord(
+                    seq=next(self.counter),
+                    time=datetime.datetime.now().isoformat(timespec="seconds"),
+                    level=level,
+                    source=source,
+                    message=message,
+                )
             )
 
-    def since(self, seq: int) -> list[dict[str, Any]]:
+    def since(self, seq: int) -> list[models.LogRecord]:
         with self.lock_:
-            return [r for r in self.records if r["seq"] > seq]
+            return [r for r in self.records if r.seq > seq]
 
 
 class Session:
@@ -267,6 +268,8 @@ class Session:
         name: Optional[str] = None,
         position: Optional[tuple[float, float]] = None,
         notes: Optional[str] = None,
+        sort_column: Optional[int] = None,
+        sort_descending: Optional[bool] = None,
     ) -> None:
         # A rename changes how a node's children name their sources (a Join's inputs), so it recalculates.
         with self.change(recalculate=name is not None):
@@ -279,6 +282,12 @@ class Session:
                 node.position = valid_position(position)
             if notes is not None:
                 node.notes = notes or None
+            if sort_column is not None:
+                if sort_column < 0:
+                    raise SessionError("A sort column is a column number, from 0")
+                node.sort_column = sort_column
+            if sort_descending is not None:
+                node.sort_descending = sort_descending
 
     def delete_node(self, node_id: str) -> None:
         with self.change():
@@ -307,118 +316,122 @@ class Session:
         node.load_config()
         return node.plugin
 
-    def change_parameter(self, node_id: str, path: str, change: dict[str, Any]) -> None:
+    def change_parameter(self, node_id: str, change: models.ParameterChange) -> None:
+        """Applies one change. Which it is: ``action``, if given; else ``column``, if given; else
+        ``value``, which a value of null (an empty number, say) sets as well as any other."""
+        path = change.path
         with self.change():
             node = self.node(node_id)
             plugin = self.plugin_of(node)
             try:
-                if "value" in change:
-                    params.set_value(plugin, path, change["value"])
-                elif change.get("action") == "add":
+                if change.action == "add":
                     params.add_row(plugin, path)
-                elif change.get("action") == "addFiles":
-                    params.add_files(plugin, path, change.get("paths") or [])
-                elif change.get("action") == "delete":
-                    params.delete_row(plugin, path, int(change.get("index", -1)))
+                elif change.action == "addFiles":
+                    params.add_files(plugin, path, change.paths or [])
+                elif change.action == "delete":
+                    if change.index is None:
+                        raise params.ParameterError(f"{path}: say which row to delete")
+                    params.delete_row(plugin, path, change.index)
+                elif change.column is not None:
+                    params.set_column(plugin, path, change.column)
                 else:
-                    raise SessionError(f"Unknown change to {path}")
+                    params.set_value(plugin, path, change.value)
             except params.ParameterError as exc:
                 raise SessionError(str(exc)) from exc
             node.mark_dirty()
 
     # ---- what the browser shows ------------------------------------------------------------------
 
-    def describe_graph(self) -> dict[str, Any]:
+    def describe_graph(self) -> models.Graph:
         with self.lock:
-            return {
-                "version": self.version,
-                "workflow": {"name": self.graph.workflow.name, "version": self.graph.workflow.version},
-                "config": str(self.config_path) if self.config_path else None,
-                "modified": self.modified,
-                "nodes": [self.describe_node(node) for node in self.graph.nodes],
-            }
+            return models.Graph(
+                version=self.version,
+                workflow=models.Workflow(name=self.graph.workflow.name, version=self.graph.workflow.version),
+                config=str(self.config_path) if self.config_path else None,
+                modified=self.modified,
+                nodes=[self.describe_node(node) for node in self.graph.nodes],
+            )
 
     @staticmethod
-    def describe_node(node: PipelineNode) -> dict[str, Any]:
+    def describe_node(node: PipelineNode) -> models.Node:
         plugin = node.plugin
-        return {
-            "id": node.uuid,
-            "name": node.name,
-            "position": list(node.position),
-            "notes": node.notes or "",
-            "status": node.status.name,
-            "message": node.message or "",
-            "parents": sorted(p.uuid for p in node.parent_nodes),
-            "plugin": (
-                {
-                    "key": plugin_key(type(plugin)),
-                    "name": plugin.name,
-                    "version": plugin.version,
-                    "description": " ".join(plugin.description.split()),
-                    "additional": " ".join(plugin.additional.split()),
-                    "link": plugin.link,
-                    "numInputs": plugin.num_inputs,
-                    "numOutputs": plugin.num_outputs,
-                    "showPreview": plugin.show_preview,
-                }
+        return models.Node(
+            id=node.uuid,
+            name=node.name,
+            position=(node.position[0], node.position[1]),
+            notes=node.notes or "",
+            status=node.status.name,
+            message=node.message or "",
+            parents=sorted(p.uuid for p in node.parent_nodes),
+            sortColumn=node.sort_column,
+            sortDescending=node.sort_descending,
+            plugin=(
+                models.NodePlugin(
+                    key=plugin_key(type(plugin)),
+                    name=plugin.name,
+                    version=plugin.version,
+                    description=" ".join(plugin.description.split()),
+                    additional=" ".join(plugin.additional.split()),
+                    link=plugin.link,
+                    numInputs=plugin.num_inputs,
+                    numOutputs=plugin.num_outputs,
+                    showPreview=plugin.show_preview,
+                )
                 if plugin
                 else None
             ),
-        }
+        )
 
-    def statuses(self) -> dict[str, Any]:
-        return {
-            "version": self.version,
-            "modified": self.modified,
-            "nodes": {n.uuid: {"status": n.status.name, "message": n.message or ""} for n in list(self.graph.nodes)},
-        }
+    def statuses(self) -> models.StateEvent:
+        return models.StateEvent(
+            type="state",
+            version=self.version,
+            modified=self.modified,
+            nodes={
+                n.uuid: models.NodeState(status=n.status.name, message=n.message or "") for n in list(self.graph.nodes)
+            },
+        )
 
-    def describe_parameters(self, node_id: str) -> list[dict[str, Any]]:
+    def describe_parameters(self, node_id: str) -> list[models.Param]:
         with self.lock:
             node = self.node(node_id)
             context = RunContext(self.graph.workflow, node.name, datetime.datetime.now())
             return params.describe_plugin(self.plugin_of(node), context)
 
-    def preview(
-        self, node_id: str, offset: int, limit: int, sort: Optional[str] = None, descending: bool = False
-    ) -> dict[str, Any]:
+    def preview(self, node_id: str, offset: int, limit: int) -> models.Preview:
+        """Rows ``offset`` on of a node's preview, in the node's own sort order."""
         node = self.node(node_id)
+        empty = models.Preview(status="WORKING", message="", columns=[], rows=[], total=0)
         if node.status != PipelineNodeStatus.RESULT:
-            return {"status": node.status.name, "message": node.message or "", "columns": [], "rows": [], "total": 0}
+            return empty.model_copy(update={"status": node.status.name, "message": node.message or ""})
         try:
             cursor = self.graph.ddbc.cursor()
         except duckdb.ConnectionException:
             # A load or New closed this graph's connection after the node was looked up.
-            return {"status": "WORKING", "message": "", "columns": [], "rows": [], "total": 0}
+            return empty
         try:
             table = cursor.table(node.table_name)
-            columns = [{"name": c, "type": str(t)} for c, t in zip(table.columns, table.dtypes)]
-            if sort is not None and sort not in table.columns:
-                raise SessionError(f"No column {sort}")
+            columns = [models.Column(name=c, type=str(t)) for c, t in zip(table.columns, table.dtypes)]
             shown = table.project(
                 ", ".join(
-                    f"CAST({duckdb_escape_identifier(c['name'])} AS VARCHAR) AS {duckdb_escape_identifier(c['name'])}"
-                    if c["type"] in TEXT_PREVIEW_TYPES
-                    else duckdb_escape_identifier(c["name"])
+                    f"CAST({duckdb_escape_identifier(c.name)} AS VARCHAR) AS {duckdb_escape_identifier(c.name)}"
+                    if c.type in TEXT_PREVIEW_TYPES
+                    else duckdb_escape_identifier(c.name)
                     for c in columns
                 )
             )
-            if sort is not None:
-                shown = shown.order(f"{duckdb_escape_identifier(sort)} {'DESC' if descending else 'ASC'} NULLS LAST")
+            if order := sort_order(table.columns, node):
+                shown = shown.order(order)
             [(total,)] = cursor.table(node.table_name).count("*").fetchall()
             rows = shown.limit(max(0, min(limit, MAX_PREVIEW_ROWS)), max(0, offset)).fetchall()
         except (duckdb.CatalogException, duckdb.ConnectionException):
             # The preview thread replaced the table, or a load closed the connection, mid-read.
-            return {"status": "WORKING", "message": "", "columns": [], "rows": [], "total": 0}
+            return empty
         finally:
             cursor.close()
-        return {
-            "status": "RESULT",
-            "message": "",
-            "columns": columns,
-            "rows": [[cell(v) for v in row] for row in rows],
-            "total": total,
-        }
+        return models.Preview(
+            status="RESULT", message="", columns=columns, rows=[[cell(v) for v in row] for row in rows], total=total
+        )
 
     # ---- full runs -------------------------------------------------------------------------------
 
@@ -481,11 +494,11 @@ class Session:
         outcome = "finished" if run.returncode == 0 else f"failed (exit status {run.returncode})"
         self.logs.add("INFO" if run.returncode == 0 else "ERROR", "run", f"Run {run.id} {outcome}")
 
-    def run_outputs(self) -> list[dict[str, Any]]:
+    def run_outputs(self) -> list[models.RunOutput]:
         """The last run's output files: each save node's file, and whether this run wrote it."""
         if not self.run:
             return []
-        described: list[dict[str, Any]] = []
+        described: list[models.RunOutput] = []
         for index, output in enumerate(self.run.outputs):
             file = pathlib.Path(output["file"]) if output["file"] else None
             try:
@@ -493,14 +506,17 @@ class Session:
             except OSError:
                 stat = None
             described.append(
-                output
-                | {
-                    "index": index,
-                    "name": file.name if file else "",
-                    "size": stat.st_size if stat else None,
+                models.RunOutput(
+                    index=index,
+                    node=output["node"],
+                    parameter=output["parameter"],
+                    file=output["file"],
+                    error=output["error"],
+                    name=file.name if file else "",
+                    size=stat.st_size if stat else None,
                     # A file older than the run is left from before it, not this run's output.
-                    "written": stat is not None and stat.st_mtime >= self.run.started_at - 1,
-                }
+                    written=stat is not None and stat.st_mtime >= self.run.started_at - 1,
+                )
             )
         return described
 
@@ -515,9 +531,9 @@ class Session:
         if self.run.returncode is None:
             raise SessionError("The run is still going")
         outputs = self.run_outputs()
-        if not 0 <= index < len(outputs) or not outputs[index]["written"]:
+        if not 0 <= index < len(outputs) or not outputs[index].written:
             raise SessionError("The run did not write that file")
-        return pathlib.Path(outputs[index]["file"])
+        return pathlib.Path(outputs[index].file)
 
     def run_log(self) -> tuple[pathlib.Path, str]:
         """The last run's whole log, and a name for it.
@@ -529,11 +545,12 @@ class Session:
             raise SessionError("Nothing has been run")
         return self.run.log_file, default_filename(self.run.context, "log", "txt")
 
-    def export_preview(self, node_id: str, sort: Optional[str], descending: bool) -> tuple[pathlib.Path, str, int]:
-        """Writes a node's whole preview table to a CSV file: the file, a name for it, and its rows.
+    def export_preview(self, node_id: str) -> tuple[pathlib.Path, str, int]:
+        """Writes a node's whole preview table, in its sort order, to a CSV file: the file, a name
+        for it, and its rows.
 
         Raises:
-            SessionError: If the node has no preview table, or ``sort`` is not one of its columns.
+            SessionError: If the node has no preview table.
         """
         node = self.node(node_id)
         if node.status != PipelineNodeStatus.RESULT:
@@ -543,12 +560,8 @@ class Session:
             cursor = self.graph.ddbc.cursor()
             try:
                 table = cursor.table(node.table_name)
-                if sort is not None:
-                    if sort not in table.columns:
-                        raise SessionError(f"No column {sort}")
-                    table = table.order(
-                        f"{duckdb_escape_identifier(sort)} {'DESC' if descending else 'ASC'} NULLS LAST"
-                    )
+                if order := sort_order(table.columns, node):
+                    table = table.order(order)
                 [(rows,)] = cursor.table(node.table_name).count("*").fetchall()
                 table.write_csv(str(target), header=True)
             finally:
@@ -581,10 +594,17 @@ class Session:
         return self.config_path.parent if self.config_path else self.start_dir
 
 
+# The largest integer a browser's JavaScript number holds exactly; DuckDB's BIGINT, HUGEINT and
+# UBIGINT go far past it.
+MAX_SAFE_INTEGER = 2**53 - 1
+
+
 def cell(value: Any) -> Any:
-    """A table value as JSON."""
-    if value is None or isinstance(value, (bool, int, str)):
+    """A table value as JSON (see models.Preview)."""
+    if value is None or isinstance(value, (bool, str)):
         return value
+    if isinstance(value, int):
+        return value if abs(value) <= MAX_SAFE_INTEGER else str(value)
     if isinstance(value, float):
         return value if math.isfinite(value) else str(value)
     if isinstance(value, decimal.Decimal):
@@ -648,3 +668,15 @@ def valid_position(position: tuple[float, float]) -> tuple[float, float]:
         raise SessionError("A node position must be two finite numbers")
     x, y = position
     return (min(max(float(x), 0.0), 1.0), min(max(float(y), 0.0), 1.0))
+
+
+def sort_order(columns: list[str], node: PipelineNode) -> Optional[str]:
+    """The ORDER BY of a node's preview, as CountESS's GUI sorts it: by column number
+    ``node.sort_column`` (ascending unless ``sort_descending``), then by every other column, so
+    that rows the column ties on keep a stable order."""
+    if not columns:
+        return None
+    key = columns[node.sort_column] if node.sort_column < len(columns) else columns[0]
+    direction = "DESC" if node.sort_descending else "ASC"
+    rest = ", ".join(duckdb_escape_identifier(c) for c in columns if c != key)
+    return f"{duckdb_escape_identifier(key)} {direction} NULLS LAST" + (f", {rest}" if rest else "")

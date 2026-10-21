@@ -34,7 +34,7 @@ const edges = computed(() =>
       source: parent,
       target: child.id,
       animated: child.status === 'WORKING',
-      selected: selectedEdge.value?.parent === parent && selectedEdge.value?.child === child.id,
+      selected: selectedEdge.value !== null && selectedEdge.value.parent === parent && selectedEdge.value.child === child.id,
     })),
   ),
 )

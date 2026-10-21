@@ -122,9 +122,8 @@ def test_a_preview_downloads_as_csv_in_its_sort_order(
     load(client, workdir)
     settled(client)
 
-    made = client.post(
-        f"/api/nodes/{node_id(client, 'Load')}/preview/download", json={"sort": "count", "descending": True}
-    )
+    client.patch(f"/api/nodes/{node_id(client, 'Load')}", json={"sortColumn": 1, "sortDescending": True})
+    made = client.post(f"/api/nodes/{node_id(client, 'Load')}/preview/download")
     response = anonymous(client).get(f"/{made.json()['url']}")
 
     assert made.json()["rows"] == 5
@@ -138,7 +137,7 @@ def test_a_downloaded_preview_leaves_no_file_behind(
     load(client, workdir)
     settled(client)
 
-    link = client.post(f"/api/nodes/{node_id(client, 'Load')}/preview/download", json={}).json()["url"]
+    link = client.post(f"/api/nodes/{node_id(client, 'Load')}/preview/download").json()["url"]
     anonymous(client).get(f"/{link}")
 
     assert list(session.state_dir.glob("preview-*.csv")) == []
@@ -154,7 +153,7 @@ def test_an_expired_preview_link_finds_nothing_and_leaves_no_file_behind(
     settled(client)
     monkeypatch.setattr(app_module, "DOWNLOAD_LINK_SECONDS", -1.0)
 
-    link = client.post(f"/api/nodes/{node_id(client, 'Load')}/preview/download", json={}).json()["url"]
+    link = client.post(f"/api/nodes/{node_id(client, 'Load')}/preview/download").json()["url"]
     response = anonymous(client).get(f"/{link}")
 
     assert response.status_code == 404
@@ -167,7 +166,7 @@ def test_a_node_without_a_preview_has_nothing_to_download(
     load(client, workdir)
     settled(client)
 
-    response = client.post(f"/api/nodes/{node_id(client, 'Save')}/preview/download", json={})
+    response = client.post(f"/api/nodes/{node_id(client, 'Save')}/preview/download")
 
     assert response.status_code == 400
 
@@ -187,7 +186,7 @@ def test_a_preview_download_is_named_from_the_date_workflow_and_node(
     name_workflow(client)
     settled(client)
 
-    link = client.post(f"/api/nodes/{node_id(client, 'Total')}/preview/download", json={}).json()["url"]
+    link = client.post(f"/api/nodes/{node_id(client, 'Total')}/preview/download").json()["url"]
     disposition = anonymous(client).get(f"/{link}").headers["content-disposition"]
 
     assert re.search(r'filename="\d{4}-\d{2}-\d{2}_fwd-test_v1-2-0_total-preview\.csv"', disposition)
