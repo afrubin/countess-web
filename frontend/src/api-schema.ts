@@ -211,7 +211,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/nodes/{node_id}/preview/download": {
+    "/api/nodes/{node_id}/preview/save": {
         parameters: {
             query?: never;
             header?: never;
@@ -220,8 +220,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Preview Download */
-        post: operations["preview_download_api_nodes__node_id__preview_download_post"];
+        /** Preview Save */
+        post: operations["preview_save_api_nodes__node_id__preview_save_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -521,11 +521,9 @@ export interface components {
         };
         /**
          * DownloadLink
-         * @description A link that downloads one file, once, within a minute. ``rows`` is a preview's row count.
+         * @description A link that downloads one file, once, within a minute.
          */
         DownloadLink: {
-            /** Rows */
-            rows?: number | null;
             /** Url */
             url: string;
         };
@@ -603,16 +601,6 @@ export interface components {
             label: string;
             /** Patterns */
             patterns: string[];
-        };
-        /**
-         * FilenameField
-         * @description A field a save path template can use (countess.core.workflow.FILENAME_FIELDS).
-         */
-        FilenameField: {
-            /** Description */
-            description: string;
-            /** Name */
-            name: string;
         };
         /**
          * FloatParamModel
@@ -909,6 +897,17 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * PreviewSave
+         * @description Save Preview CSV; a file already there is replaced only if ``overwrite``.
+         */
+        PreviewSave: {
+            /**
+             * Overwrite
+             * @default false
+             */
+            overwrite: boolean;
+        };
         /** RunEvent */
         RunEvent: {
             run: components["schemas"]["RunSummary"] | null;
@@ -958,18 +957,19 @@ export interface components {
         };
         /**
          * SaveFileParamModel
-         * @description FileSaveParam: a file to write, possibly a template naming it from the run. ``filled`` is the
-         *     file it names for a run starting now, or ``templateError`` why it names none.
+         * @description FileSaveParam: a file to write. ``inOutputDir`` is a relative OutputFileParam (CSV Save's
+         *     filename), which each run writes in its own output directory; otherwise ``absolute`` is the file,
+         *     resolved against the pipeline's folder.
          */
         SaveFileParamModel: {
-            /** Fields */
-            fields: components["schemas"]["FilenameField"][];
+            /** Absolute */
+            absolute: string | null;
             /** Filetypes */
             fileTypes: components["schemas"]["FileType"][];
-            /** Filled */
-            filled: string | null;
             /** Hide */
             hide: boolean;
+            /** Inoutputdir */
+            inOutputDir: boolean;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -981,8 +981,6 @@ export interface components {
             path: string;
             /** Readonly */
             readOnly: boolean;
-            /** Templateerror */
-            templateError: string | null;
             /** Value */
             value: string | null;
         };
@@ -990,6 +988,16 @@ export interface components {
         SavedConfig: {
             /** Path */
             path: string;
+        };
+        /**
+         * SavedPreview
+         * @description Where a preview was saved, on the server, and a link that downloads it once within a minute.
+         */
+        SavedPreview: {
+            /** Path */
+            path: string;
+            /** Url */
+            url: string;
         };
         ServerEvent: components["schemas"]["StateEvent"] | components["schemas"]["RunEvent"] | components["schemas"]["LogsEvent"];
         /**
@@ -1078,21 +1086,35 @@ export interface components {
         };
         /**
          * Workflow
-         * @description countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset.
+         * @description countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset; the
+         *     output directory template each run's files go in; and whether CSV files start with a metadata
+         *     header.
          */
         Workflow: {
+            /** Metadataheader */
+            metadataHeader: boolean;
             /** Name */
             name: string | null;
+            /** Outputdir */
+            outputDir: string;
             /** Version */
             version: string | null;
         };
         /**
          * WorkflowUpdate
-         * @description An empty string unsets the name or version.
+         * @description The whole workflow, replacing what it was. An empty string or null unsets the name or version,
+         *     and makes the output directory the default.
          */
         WorkflowUpdate: {
+            /**
+             * Metadataheader
+             * @default true
+             */
+            metadataHeader: boolean;
             /** Name */
             name?: string | null;
+            /** Outputdir */
+            outputDir?: string | null;
             /** Version */
             version?: string | null;
         };
@@ -1563,7 +1585,7 @@ export interface operations {
             };
         };
     };
-    preview_download_api_nodes__node_id__preview_download_post: {
+    preview_save_api_nodes__node_id__preview_save_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1572,7 +1594,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewSave"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1580,8 +1606,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DownloadLink"];
+                    "application/json": components["schemas"]["SavedPreview"];
                 };
+            };
+            /** @description The file is already there */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

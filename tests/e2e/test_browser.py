@@ -139,25 +139,45 @@ def test_a_run_writes_its_outputs_on_the_server_and_offers_them_for_download(
     saved = tmp_path / download.value.suggested_filename
     download.value.save_as(saved)
 
-    assert saved.read_bytes() == (server.workdir / "totals.csv").read_bytes()
+    [written] = server.workdir.glob("*/totals.csv")
+    assert saved.read_bytes() == written.read_bytes()
 
 
-def test_a_preview_downloads_as_csv_in_the_order_shown(app: Page, tmp_path: pathlib.Path) -> None:
+def data_lines(path: pathlib.Path) -> list[str]:
+    return [line for line in path.read_text().splitlines() if not line.startswith("#")]
+
+
+def test_save_preview_csv_writes_the_order_shown_and_asks_before_replacing(
+    app: Page, server: Server, tmp_path: pathlib.Path
+) -> None:
     node(app, "Load").click()
     preview_rows(app)
     app.locator(".preview th", has_text="count").click()
     expect(app.locator(".preview th", has_text="count")).to_contain_text("▲")
 
+    app.get_by_role("button", name="Save Preview CSV").click()
+    expect(app.locator(".preview .saved")).to_contain_text("load_preview.csv")
     with app.expect_download() as download:
-        app.get_by_role("button", name="Download CSV").click()
+        app.locator(".preview .saved").get_by_role("button", name="Download").click()
     saved = tmp_path / download.value.suggested_filename
     download.value.save_as(saved)
 
-    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}_load-preview\.csv", download.value.suggested_filename)
-    assert [line.split(",")[1] for line in saved.read_text().splitlines()[1:]] == ["1", "2", "3", "4", "5"]
+    assert download.value.suggested_filename == "load_preview.csv"
+    assert [line.split(",")[1] for line in data_lines(saved)[1:]] == ["1", "2", "3", "4", "5"]
+    [on_server] = server.workdir.glob("*/load_preview.csv")
+    assert on_server.read_bytes() == saved.read_bytes()
+
+    asked: list[str] = []
+    app.once("dialog", lambda dialog: (asked.append(dialog.message), dialog.dismiss()))
+    on_server.write_text("mine")
+    app.get_by_role("button", name="Save Preview CSV").click()
+    expect(app.get_by_role("button", name="Save Preview CSV")).to_be_enabled()
+
+    assert "load_preview.csv is already there" in asked[0]
+    assert on_server.read_text() == "mine"
 
 
-# ---- the workflow's name and version ------------------------------------------------------------
+# ---- the workflow ---------------------------------------------------------------------------------
 
 
 def test_a_version_that_is_not_semantic_is_refused_in_the_dialog(app: Page) -> None:
@@ -168,27 +188,25 @@ def test_a_version_that_is_not_semantic_is_refused_in_the_dialog(app: Page) -> N
     expect(app.locator(".dialog .failed")).to_contain_text("not a semantic version")
 
 
-def test_a_named_workflow_names_the_run_outputs_and_log(app: Page, server: Server, tmp_path: pathlib.Path) -> None:
+def test_a_named_workflows_run_writes_into_its_output_directory(app: Page, server: Server) -> None:
     app.get_by_role("button", name="Workflow…").click()
     app.get_by_label("Name").fill("E2E test")
     app.get_by_label("Version").fill("2.0.1")
+    app.get_by_label("Output directory").fill("out/{workflow}_{version}")
     app.locator(".dialog").get_by_role("button", name="Save", exact=True).click()
     expect(app.locator(".toolbar")).to_contain_text("E2E test v2.0.1")
 
     node(app, "Save").click()
-    filename = app.locator(".save-path input")
-    filename.fill("out/{date}_{workflow}_{version}_{node}.csv")
-    filename.press("Tab")
-    expect(app.locator(".template-result")).to_contain_text("_e2e-test_v2-0-1_save.csv")
+    expect(app.locator(".save-where")).to_have_text("in each run's output directory")
 
     run_pipeline(app)
     app.get_by_role("button", name="Outputs…").click()
-    expect(app.locator(".dialog .name")).to_have_text([re.compile(r"^\d{4}-\d{2}-\d{2}_e2e-test_v2-0-1_save\.csv$")])
+    expect(app.locator(".dialog .name")).to_have_text(["totals.csv"])
     with app.expect_download() as download:
         app.get_by_role("button", name="Download run log").click()
 
-    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}_e2e-test_v2-0-1_run-log\.txt", download.value.suggested_filename)
-    assert len(list((server.workdir / "out").glob("*_e2e-test_v2-0-1_save.csv"))) == 1
+    assert download.value.suggested_filename == "run-log.txt"
+    assert (server.workdir / "out" / "e2e-test_v2-0-1" / "totals.csv").read_text().startswith("# CountESS ")
 
 
 # ---- themes and text size -----------------------------------------------------------------------

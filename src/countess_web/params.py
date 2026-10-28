@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import decimal
 import math
+import os
 from collections.abc import Sequence
 from typing import Any, Literal, Optional, Union
 
@@ -29,6 +30,7 @@ from countess.core.parameters import (
     IntegerParam,
     MultiChoiceParam,
     MultiParam,
+    OutputFileParam,
     PerColumnArrayParam,
     ScalarParam,
     StringCharacterSetParam,
@@ -37,7 +39,7 @@ from countess.core.parameters import (
     TextParam,
 )
 from countess.core.plugins import BasePlugin
-from countess.core.workflow import FILENAME_FIELDS, RunContext, WorkflowError
+from countess.core.workflow import RunContext, WorkflowError
 
 from countess_web import models
 
@@ -46,14 +48,12 @@ class ParameterError(ValueError):
     """A change the browser asked for that the parameter cannot take."""
 
 
-def describe_plugin(plugin: BasePlugin, context: RunContext) -> list[models.Param]:
-    """A plugin's parameters; ``context`` fills in save path templates."""
-    return [describe(param, key, context) for key, param in plugin.params.items()]
+def describe_plugin(plugin: BasePlugin) -> list[models.Param]:
+    """A plugin's parameters."""
+    return [describe(param, key) for key, param in plugin.params.items()]
 
 
-def describe(  # pylint: disable=too-many-return-statements
-    param: BaseParam, path: str, context: RunContext
-) -> models.Param:
+def describe(param: BaseParam, path: str) -> models.Param:  # pylint: disable=too-many-return-statements
     """One parameter, and those inside it, as the model of its CountESS class family.
 
     The order of the checks is CountESS's class hierarchy, most specific first: a TextParam is a
@@ -63,7 +63,7 @@ def describe(  # pylint: disable=too-many-return-statements
     common = {"path": path, "label": param.label, "hide": bool(param.hide), "readOnly": bool(param.read_only)}
 
     if isinstance(param, ArrayParam):
-        return describe_array(param, path, context, common)
+        return describe_array(param, path, common)
     if isinstance(param, MultiParam):
         if isinstance(param, TabularMultiParam):
             layout: Literal["plain", "table", "frame"] = "table"
@@ -71,7 +71,7 @@ def describe(  # pylint: disable=too-many-return-statements
             layout = "frame"
         else:
             layout = "plain"
-        children = [describe(p, f"{path}.{k}", context) for k, p in param.params.items()]
+        children = [describe(p, f"{path}.{k}") for k, p in param.params.items()]
         return models.GroupParamModel(kind="group", layout=layout, children=children, **common)
     if isinstance(param, BooleanParam):
         return models.BooleanParamModel(kind="boolean", value=param.value, **common)
@@ -81,7 +81,7 @@ def describe(  # pylint: disable=too-many-return-statements
             kind="multichoice", values=[c for c in param.choices if c in chosen], choices=list(param.choices), **common
         )
     if isinstance(param, FileSaveParam):
-        return describe_save_path(param, context, common)
+        return describe_save_path(param, common)
     if isinstance(param, FileBaseParam):
         return models.FileParamModel(
             kind="file",
@@ -136,33 +136,28 @@ def finite_or_none(value: Optional[float]) -> Optional[float]:
     return value if value is not None and math.isfinite(value) else None
 
 
-def describe_save_path(param: FileSaveParam, context: RunContext, common: dict[str, Any]) -> models.SaveFileParamModel:
-    """A save path, which may be a template: the file it names for a run starting now, or why it cannot."""
-    filled, error = None, None
-    if param.value:
-        try:
-            filled = param.get_file_path_for(context)
-        except WorkflowError as exc:
-            error = str(exc)
+def describe_save_path(param: FileSaveParam, common: dict[str, Any]) -> models.SaveFileParamModel:
+    """A file to write. A relative OutputFileParam (CSV Save's filename) is in each run's output
+    directory, so it has no one absolute path; any other is resolved against the pipeline's folder."""
+    in_output_dir = isinstance(param, OutputFileParam) and not os.path.isabs(os.path.expanduser(param.value or ""))
     return models.SaveFileParamModel(
         kind="save-file",
         value=param.value,
-        filled=filled,
-        templateError=error,
-        fields=[models.FilenameField(name=n, description=d) for n, d in FILENAME_FIELDS.items()],
+        absolute=param.get_file_path() if param.value and not in_output_dir else None,
+        inOutputDir=in_output_dir,
         fileTypes=file_types(param.file_types),
         **common,
     )
 
 
-def describe_array(param: ArrayParam, path: str, context: RunContext, common: dict[str, Any]) -> models.ArrayParamModel:
+def describe_array(param: ArrayParam, path: str, common: dict[str, Any]) -> models.ArrayParamModel:
     size = len(param.params)
     editable = not param.read_only
     return models.ArrayParamModel(
         kind="array",
-        items=[describe(p, f"{path}.{n}", context) for n, p in enumerate(param.params)],
+        items=[describe(p, f"{path}.{n}") for n, p in enumerate(param.params)],
         # The template is not itself saved; its path names where a new row will be.
-        template=describe(param.param, f"{path}.{size}", context),
+        template=describe(param.param, f"{path}.{size}"),
         minSize=param.min_size,
         maxSize=param.max_size,
         perColumn=isinstance(param, PerColumnArrayParam),
@@ -190,14 +185,18 @@ def file_types(types: Sequence[tuple[str, Union[str, list[str]]]]) -> list[model
 
 
 def output_files(plugin: BasePlugin, context: RunContext) -> list[tuple[str, str, str]]:
-    """The files a plugin is set to write in ``context``: (parameter path, absolute file, error).
-    A template that cannot be filled gives no file and the reason."""
+    """The files a plugin is set to write in ``context``: (parameter path, absolute file, error). A
+    relative OutputFileParam is in the run's output directory; if the workflow's output directory
+    template cannot be filled, it gives no file and the reason."""
     found = []
 
     def walk(param: BaseParam, path: str) -> None:
         if isinstance(param, FileSaveParam) and param.value:
             try:
-                found.append((path, param.get_file_path_for(context), ""))
+                if isinstance(param, OutputFileParam):
+                    found.append((path, param.get_output_path(context.output_dir()), ""))
+                else:
+                    found.append((path, param.get_file_path(), ""))
             except WorkflowError as exc:
                 found.append((path, "", str(exc)))
         elif isinstance(param, ArrayParam):

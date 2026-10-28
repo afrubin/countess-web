@@ -101,16 +101,8 @@ async function chooseFile(param: ParamOf<'file'>): Promise<void> {
 }
 
 async function chooseSaveFile(param: ParamOf<'save-file'>): Promise<void> {
-  const [chosen] = (await actions.chooseFiles(param.label, 'save', param.fileTypes, param.filled)) ?? []
-  if (chosen === undefined) return
-  // Saving to another folder under the name the template gave keeps the template: the file is
-  // then named afresh by each run, not fixed to today's name.
-  const template = baseName(param.value ?? '')
-  if (template.includes('{') && param.filled !== null && baseName(chosen) === baseName(param.filled)) {
-    await commit(`${dirName(chosen)}/${template}`)
-  } else {
-    await commit(chosen)
-  }
+  const [chosen] = (await actions.chooseFiles(param.label, 'save', param.fileTypes, param.absolute)) ?? []
+  if (chosen !== undefined) await commit(chosen)
 }
 
 // ---- lists ---------------------------------------------------------------------------------------
@@ -266,13 +258,9 @@ function selectedValue(event: Event): string {
           />
           <button :disabled="param.readOnly" @click.prevent="chooseSaveFile(param)">Choose…</button>
         </span>
-        <span v-if="param.templateError" class="template-error">{{ param.templateError }}</span>
-        <span v-else-if="param.filled" class="template-result" :title="param.filled">
-          → {{ baseName(param.filled) }} <span class="template-dir">in {{ dirName(param.filled) }}</span>
-        </span>
-        <span v-if="param.fields.length" class="template-fields">
-          Fields:
-          <code v-for="field in param.fields" :key="field.name" :title="field.description">{{ '{' + field.name + '}' }}</code>
+        <span v-if="param.inOutputDir" class="save-where">in each run's output directory</span>
+        <span v-else-if="param.absolute" class="save-where" :title="param.absolute">
+          → {{ baseName(param.absolute) }} <span class="save-dir">in {{ dirName(param.absolute) }}</span>
         </span>
       </span>
 
@@ -420,23 +408,15 @@ legend {
   font-family: var(--font-mono);
 }
 .allowed,
-.template-result,
-.template-fields {
+.save-where {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.template-dir {
+.save-dir {
   opacity: 0.75;
-}
-.template-fields code {
-  margin-left: 4px;
-}
-.template-error {
-  color: var(--color-bad);
-  font-size: var(--text-sm);
 }
 .add {
   margin-top: 4px;

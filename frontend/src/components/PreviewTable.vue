@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { api, followDownload } from '../api'
+import { api, ApiError, followDownload } from '../api'
 import { attempt, refreshGraph, store } from '../store'
-import type { GraphNode, Preview } from '../types'
+import type { GraphNode, Preview, SavedPreview } from '../types'
 
 // A node's preview is sorted as CountESS's GUI sorts it: by the node's own column number and
 // direction (saved with the pipeline), then by its other columns.
@@ -12,6 +12,9 @@ const PAGE = 100
 const preview = ref<Preview | null>(null)
 const offset = ref(0)
 const failed = ref<string | null>(null)
+const saving = ref(false)
+// The last preview saved, and its one-time download link until that is used.
+const saved = ref<{ path: string; url: string | null } | null>(null)
 
 async function load(): Promise<void> {
   if (props.node.status !== 'RESULT') return
@@ -31,6 +34,7 @@ watch(
     if (previous && previous[0] !== props.node.id) {
       offset.value = 0
       preview.value = null
+      saved.value = null
     }
     if (status === 'RESULT') void load()
   },
@@ -52,19 +56,33 @@ function page(step: number): void {
   void load()
 }
 
-const downloading = ref(false)
-
-async function download(): Promise<void> {
-  downloading.value = true
+/** Save Preview CSV, as CountESS's GUI does: to <output directory>/<node-name>_preview.csv on the
+ * server, asking before replacing a file already there. */
+async function savePreview(): Promise<void> {
+  saving.value = true
+  saved.value = null
   try {
     failed.value = null
-    const link = await api.previewLink(props.node.id)
-    followDownload(link.url)
+    let result: SavedPreview
+    try {
+      result = await api.savePreview(props.node.id, false)
+    } catch (exc) {
+      if (!(exc instanceof ApiError && exc.status === 409)) throw exc
+      if (!confirm(`${exc.message}. Replace it?`)) return
+      result = await api.savePreview(props.node.id, true)
+    }
+    saved.value = { path: result.path, url: result.url }
   } catch (exc) {
     failed.value = exc instanceof Error ? exc.message : String(exc)
   } finally {
-    downloading.value = false
+    saving.value = false
   }
+}
+
+function downloadSaved(): void {
+  if (!saved.value?.url) return
+  followDownload(saved.value.url)
+  saved.value.url = null
 }
 
 /** A cell as the preview model sends it: null, true or false, a number, text, or a list or object. */
@@ -89,17 +107,22 @@ function show(value: unknown): string {
         <span>{{ preview.total.toLocaleString() }} rows</span>
         <button
           class="download"
-          :disabled="downloading"
-          title="Download these rows as CSV, in the order shown. A preview holds at most the preview's row limit; Run writes every row."
-          @click="download"
+          :disabled="saving"
+          title="Save these rows on the server as <node-name>_preview.csv in the output directory, in the order shown. A preview holds at most the preview's row limit; Run writes every row."
+          @click="savePreview"
         >
-          {{ downloading ? 'Preparing…' : 'Download CSV' }}
+          {{ saving ? 'Saving…' : 'Save Preview CSV' }}
         </button>
         <span class="pager">
           <button :disabled="offset === 0" @click="page(-1)">‹</button>
           {{ preview.total ? offset + 1 : 0 }}–{{ Math.min(offset + PAGE, preview.total) }}
           <button :disabled="offset + PAGE >= preview.total" @click="page(1)">›</button>
         </span>
+      </div>
+      <div v-if="saved" class="saved" role="status">
+        <span class="saved-path" :title="saved.path">Saved {{ saved.path }}</span>
+        <button v-if="saved.url" @click="downloadSaved">Download</button>
+        <button class="dismiss" aria-label="Dismiss" @click="saved = null">×</button>
       </div>
       <div class="scroller">
         <table>
@@ -154,6 +177,27 @@ function show(value: unknown): string {
   margin-right: auto;
   font-size: var(--text-sm);
   padding: 1px 8px;
+}
+.saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 4px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.saved-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.saved button {
+  font-size: var(--text-sm);
+  padding: 1px 8px;
+}
+.dismiss {
+  margin-left: auto;
 }
 .scroller {
   overflow: auto;

@@ -27,17 +27,21 @@ In the browser:
 - **Run** runs the whole pipeline in a separate process: editing the pipeline while it runs does not change the run,
   and closing the browser does not stop it. The run's output appears in the log at the bottom.
 - **Workflow** (the button showing the workflow's name, once it has one) sets a short name and a semantic version
-  for the pipeline, saved with it. Output file names are made from them: a new CSV Save writes
-  `{date}_{workflow}_{version}_{node}.csv` beside the pipeline file, such as
-  `2026-10-19_fwd-saturation_v1-2-0_save-results.csv`, so that runs on different days or of different versions do
-  not overwrite each other. A save node's filename can use the fields `{date}`, `{time}`, `{workflow}`, `{version}`
-  and `{node}` in any arrangement; the page shows the file it names now. Downloads follow the same pattern:
-  `…_total-preview.csv` for a preview, `…_run-log.txt` for a run's log.
-- **Where results go:** a run writes its files on the server, wherever each save node (CSV Save, say) is set to
-  write. **Outputs…** lists the files the last run wrote, with a button to download each to the computer showing the
-  page; **Download CSV** above a preview downloads that preview, in the order shown. A preview holds at most
+  for the pipeline, its output directory, and whether CSV files start with a metadata header, all saved with it.
+- **Where results go:** each run writes its files on the server into an output directory of its own, by default
+  `{date}_{time}_{workflow}_{version}` beside the pipeline file, such as
+  `2026-10-19_14-05-09_fwd-saturation_v1-2-0/`. The files in it keep fixed names that downstream scripts can rely
+  on: a CSV Save writes `results.csv` unless given another name, and an absolute filename is written where it says.
+  **Outputs…** lists the files the last run wrote, with a button to download each to the computer showing the page,
+  and the run's log, downloaded as `run-log.txt`. **Save Preview CSV** above a preview writes that preview, in the
+  order shown, to `<node-name>_preview.csv` in the output directory (its date and time those of when the pipeline was
+  opened), asking before replacing one already there, then offers it for download. A preview holds at most
   `--preview-rows` rows (100,000 unless set); a run writes every row. On a cluster, large results are better copied
   with `scp`, `rsync` or Globus than through the browser.
+- **Metadata header:** a CSV file CountESS writes starts, unless turned off, with lines beginning `#` that say what
+  wrote it: the CountESS version, when, the workflow's name and version, and the nodes the data came through with
+  their plugins' versions. CSV Load skips them; pandas reads past them with `comment="#"`, and R with
+  `comment.char = "#"`.
 - **Open**, **Save** and **Save as** read and write pipeline `.ini` files, and **Choose…** picks input files, all
   through a browser of the *server's* files: on a cluster, the data and the pipeline are where the job runs, not on
   the computer showing the page.
@@ -89,7 +93,7 @@ given. Anyone who can use the page can do the same.
 - Every API request needs the token printed at start, sent in a request header, and the event stream needs it as its
   first message. The page takes the token out of the address bar and keeps it in the tab's own storage.
 - A download is a link the API issues to a holder of the token: it works once, for a minute, and only for a file the
-  last run wrote or a preview just exported, never an arbitrary path.
+  last run wrote or a preview just saved, never an arbitrary path.
 - The token is never a cookie. Browsers send a `localhost` cookie to every port, so every web server on the machine
   (or reached through another tunnel) would receive it. And because it travels in a header, a page from another site
   cannot make a request that carries it, and two CountESS servers do not interfere with each other.
@@ -129,8 +133,8 @@ declare their parameters without any interface code. countess-web replaces only 
 
 ## Requirements
 
-countess-web needs a CountESS with workflow names and versions (its `countess.core.workflow` module), which is
-not in a CountESS release yet; until it is, install CountESS from the branch that adds it.
+countess-web needs a CountESS with workflows (its `countess.core.workflow` and `countess.core.output` modules),
+which is not in a CountESS release yet; until it is, install CountESS from the branch that adds it.
 
 ## Development
 
@@ -158,7 +162,7 @@ pytest -m e2e
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the server's tests, the front end's lint, unit tests, type-check
 and build, and the browser tests, keeping a Playwright trace of any that fail. It installs CountESS from the git
-ref in `COUNTESS_REF`, since countess-web needs CountESS's workflow names and versions, which no release has yet.
+ref in `COUNTESS_REF`, since countess-web needs CountESS's workflows, which no release has yet.
 
 ### The API's types
 

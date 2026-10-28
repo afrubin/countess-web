@@ -4,7 +4,6 @@ parameters fitting the models."""
 
 from __future__ import annotations
 
-import datetime
 import decimal
 import math
 
@@ -28,6 +27,7 @@ from countess.core.parameters import (
     IntegerParam,
     MultiChoiceParam,
     MultiParam,
+    OutputFileParam,
     PerColumnArrayParam,
     StringCharacterSetParam,
     StringParam,
@@ -35,16 +35,14 @@ from countess.core.parameters import (
     TextParam,
 )
 from countess.core.plugins import BasePlugin, get_plugin_classes
-from countess.core.workflow import RunContext, WorkflowInfo
 
 from countess_web import models, params
 
-CONTEXT = RunContext(WorkflowInfo("FWD test", "1.2.0"), "Save Results", datetime.datetime(2026, 10, 21, 9, 30))
 PARAMS = pydantic.TypeAdapter(list[models.Param])
 
 
 def described(param: object) -> dict:
-    return params.describe(param, "p", CONTEXT).model_dump()  # type: ignore[arg-type]
+    return params.describe(param, "p").model_dump()  # type: ignore[arg-type]
 
 
 # ---- values as CountESS holds them --------------------------------------------------------------
@@ -161,10 +159,22 @@ def test_a_file_to_read_and_a_file_to_write_are_different_kinds() -> None:
     assert described(FileSaveParam("Filename", "out.csv"))["kind"] == "save-file"
 
 
-def test_a_save_path_is_filled_from_the_run_context() -> None:
-    param = FileSaveParam("Filename", "{date}_{workflow}_{version}_{node}.csv", base_dir="/data")
+def test_a_save_path_is_resolved_against_the_pipelines_folder() -> None:
+    out = described(FileSaveParam("Filename", "out.csv", base_dir="/data"))
 
-    assert described(param)["filled"] == "/data/2026-10-21_fwd-test_v1-2-0_save-results.csv"
+    assert (out["absolute"], out["inOutputDir"]) == ("/data/out.csv", False)
+
+
+def test_a_relative_output_file_is_in_each_runs_output_directory() -> None:
+    out = described(OutputFileParam("Filename", "results.csv", base_dir="/data"))
+
+    assert (out["absolute"], out["inOutputDir"]) == (None, True)
+
+
+def test_an_absolute_output_file_is_where_it_says() -> None:
+    out = described(OutputFileParam("Filename", "/elsewhere/results.csv", base_dir="/data"))
+
+    assert (out["absolute"], out["inOutputDir"]) == ("/elsewhere/results.csv", False)
 
 
 @pytest.mark.parametrize(
@@ -206,7 +216,7 @@ def test_a_file_array_is_added_to_by_choosing_files() -> None:
 def test_every_installed_plugins_parameters_fit_the_models(cls: type[BasePlugin]) -> None:
     plugin = cls()
 
-    out = params.describe_plugin(plugin, CONTEXT)
+    out = params.describe_plugin(plugin)
 
     assert PARAMS.validate_json(PARAMS.dump_json(out)) == out
     assert [p.path for p in out] == list(plugin.params)

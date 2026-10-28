@@ -170,7 +170,7 @@ def test_a_saved_pipeline_loads_back_with_its_changes(
     client: fastapi.testclient.TestClient, workdir: pathlib.Path
 ) -> None:
     ids = load(client, workdir)
-    client.post(f"/api/nodes/{ids['Save']}/parameters", json={"path": "filename", "value": str(workdir / "other.csv")})
+    client.post(f"/api/nodes/{ids['Save']}/parameters", json={"path": "filename", "value": "other.csv"})
 
     client.post("/api/config/save", json={"path": str(workdir / "saved.ini")})
     reloaded = load_path(client, workdir / "saved.ini")
@@ -198,6 +198,7 @@ def test_loading_a_file_that_is_not_there_is_refused(
 
 def test_a_run_writes_the_pipelines_output(client: fastapi.testclient.TestClient, workdir: pathlib.Path) -> None:
     load(client, workdir)
+    client.patch("/api/workflow", json={"outputDir": "out", "metadataHeader": False})
 
     client.post("/api/run")
     deadline = time.monotonic() + 60
@@ -205,7 +206,12 @@ def test_a_run_writes_the_pipelines_output(client: fastapi.testclient.TestClient
         time.sleep(0.1)
 
     assert run["returncode"] == 0
-    assert (workdir / "totals.csv").read_text().splitlines() == ["variant,count__sum", "alpha,7", "beta,7", "gamma,1"]
+    assert (workdir / "out" / "totals.csv").read_text().splitlines() == [
+        "variant,count__sum",
+        "alpha,7",
+        "beta,7",
+        "gamma,1",
+    ]
 
 
 # ---- files --------------------------------------------------------------------------------------

@@ -517,19 +517,8 @@
       },
       "DownloadLink": {
         "additionalProperties": false,
-        "description": "A link that downloads one file, once, within a minute. ``rows`` is a preview's row count.",
+        "description": "A link that downloads one file, once, within a minute.",
         "properties": {
-          "rows": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rows"
-          },
           "url": {
             "title": "Url",
             "type": "string"
@@ -739,26 +728,6 @@
           "patterns"
         ],
         "title": "FileType",
-        "type": "object"
-      },
-      "FilenameField": {
-        "additionalProperties": false,
-        "description": "A field a save path template can use (countess.core.workflow.FILENAME_FIELDS).",
-        "properties": {
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "description"
-        ],
-        "title": "FilenameField",
         "type": "object"
       },
       "FloatParamModel": {
@@ -1665,6 +1634,19 @@
         "title": "Preview",
         "type": "object"
       },
+      "PreviewSave": {
+        "additionalProperties": false,
+        "description": "Save Preview CSV; a file already there is replaced only if ``overwrite``.",
+        "properties": {
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "title": "PreviewSave",
+        "type": "object"
+      },
       "RunEvent": {
         "additionalProperties": false,
         "properties": {
@@ -1803,23 +1785,9 @@
       },
       "SaveFileParamModel": {
         "additionalProperties": false,
-        "description": "FileSaveParam: a file to write, possibly a template naming it from the run. ``filled`` is the\nfile it names for a run starting now, or ``templateError`` why it names none.",
+        "description": "FileSaveParam: a file to write. ``inOutputDir`` is a relative OutputFileParam (CSV Save's\nfilename), which each run writes in its own output directory; otherwise ``absolute`` is the file,\nresolved against the pipeline's folder.",
         "properties": {
-          "fields": {
-            "items": {
-              "$ref": "#/components/schemas/FilenameField"
-            },
-            "title": "Fields",
-            "type": "array"
-          },
-          "fileTypes": {
-            "items": {
-              "$ref": "#/components/schemas/FileType"
-            },
-            "title": "Filetypes",
-            "type": "array"
-          },
-          "filled": {
+          "absolute": {
             "anyOf": [
               {
                 "type": "string"
@@ -1828,10 +1796,21 @@
                 "type": "null"
               }
             ],
-            "title": "Filled"
+            "title": "Absolute"
+          },
+          "fileTypes": {
+            "items": {
+              "$ref": "#/components/schemas/FileType"
+            },
+            "title": "Filetypes",
+            "type": "array"
           },
           "hide": {
             "title": "Hide",
+            "type": "boolean"
+          },
+          "inOutputDir": {
+            "title": "Inoutputdir",
             "type": "boolean"
           },
           "kind": {
@@ -1850,17 +1829,6 @@
           "readOnly": {
             "title": "Readonly",
             "type": "boolean"
-          },
-          "templateError": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Templateerror"
           },
           "value": {
             "anyOf": [
@@ -1881,9 +1849,8 @@
           "readOnly",
           "kind",
           "value",
-          "filled",
-          "templateError",
-          "fields",
+          "absolute",
+          "inOutputDir",
           "fileTypes"
         ],
         "title": "SaveFileParamModel",
@@ -1901,6 +1868,26 @@
           "path"
         ],
         "title": "SavedConfig",
+        "type": "object"
+      },
+      "SavedPreview": {
+        "additionalProperties": false,
+        "description": "Where a preview was saved, on the server, and a link that downloads it once within a minute.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "url"
+        ],
+        "title": "SavedPreview",
         "type": "object"
       },
       "ServerEvent": {
@@ -2124,8 +2111,12 @@
       },
       "Workflow": {
         "additionalProperties": false,
-        "description": "countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset.",
+        "description": "countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset; the\noutput directory template each run's files go in; and whether CSV files start with a metadata\nheader.",
         "properties": {
+          "metadataHeader": {
+            "title": "Metadataheader",
+            "type": "boolean"
+          },
           "name": {
             "anyOf": [
               {
@@ -2136,6 +2127,10 @@
               }
             ],
             "title": "Name"
+          },
+          "outputDir": {
+            "title": "Outputdir",
+            "type": "string"
           },
           "version": {
             "anyOf": [
@@ -2151,15 +2146,22 @@
         },
         "required": [
           "name",
-          "version"
+          "version",
+          "outputDir",
+          "metadataHeader"
         ],
         "title": "Workflow",
         "type": "object"
       },
       "WorkflowUpdate": {
         "additionalProperties": false,
-        "description": "An empty string unsets the name or version.",
+        "description": "The whole workflow, replacing what it was. An empty string or null unsets the name or version,\nand makes the output directory the default.",
         "properties": {
+          "metadataHeader": {
+            "default": true,
+            "title": "Metadataheader",
+            "type": "boolean"
+          },
           "name": {
             "anyOf": [
               {
@@ -2170,6 +2172,17 @@
               }
             ],
             "title": "Name"
+          },
+          "outputDir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputdir"
           },
           "version": {
             "anyOf": [
@@ -2922,9 +2935,9 @@
         "summary": "Preview"
       }
     },
-    "/api/nodes/{node_id}/preview/download": {
+    "/api/nodes/{node_id}/preview/save": {
       "post": {
-        "operationId": "preview_download_api_nodes__node_id__preview_download_post",
+        "operationId": "preview_save_api_nodes__node_id__preview_save_post",
         "parameters": [
           {
             "in": "path",
@@ -2936,16 +2949,29 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewSave"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DownloadLink"
+                  "$ref": "#/components/schemas/SavedPreview"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "description": "The file is already there"
           },
           "422": {
             "content": {
@@ -2958,7 +2984,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Preview Download"
+        "summary": "Preview Save"
       }
     },
     "/api/plugins": {

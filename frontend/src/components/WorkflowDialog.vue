@@ -5,6 +5,8 @@ import { setGraph, store } from '../store'
 
 const name = ref(store.graph.workflow.name ?? '')
 const version = ref(store.graph.workflow.version ?? '')
+const outputDir = ref(store.graph.workflow.outputDir)
+const metadataHeader = ref(store.graph.workflow.metadataHeader)
 const failed = ref<string | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 
@@ -13,7 +15,14 @@ onMounted(() => nameInput.value?.focus())
 async function save() {
   try {
     failed.value = null
-    setGraph(await api.setWorkflow(name.value, version.value))
+    setGraph(
+      await api.setWorkflow({
+        name: name.value,
+        version: version.value,
+        outputDir: outputDir.value,
+        metadataHeader: metadataHeader.value,
+      }),
+    )
     store.showWorkflow = false
   } catch (exc) {
     failed.value = exc instanceof ApiError || exc instanceof Error ? exc.message : String(exc)
@@ -27,10 +36,15 @@ async function save() {
       <h2>Workflow</h2>
       <label>Name <input ref="nameInput" v-model="name" placeholder="FWD saturation" /></label>
       <label>Version <input v-model="version" placeholder="1.0.0" /></label>
+      <label>Output directory <input v-model="outputDir" spellcheck="false" placeholder="{date}_{time}_{workflow}_{version}" /></label>
+      <label class="check"><input v-model="metadataHeader" type="checkbox" /> Start CSV files with a metadata header (<code>#</code> lines)</label>
       <p class="hint">
         A short name, and a <a href="https://semver.org" target="_blank" rel="noopener">semantic version</a> such as
-        1.0.0. Output file names are made from them: a CSV Save writes
-        <code>{date}_{workflow}_{version}_{node}.csv</code> unless told otherwise.
+        1.0.0. Each run writes its files into the output directory, which may use the fields
+        <code>{date}</code>, <code>{time}</code>, <code>{workflow}</code> and <code>{version}</code>; a relative one is
+        beside the pipeline file. A CSV Save writes <code>results.csv</code> there unless told otherwise, and
+        <em>Save Preview CSV</em> writes there too. The metadata header says what wrote a file; a CSV Save can
+        override this setting.
       </p>
       <p v-if="failed" class="failed" role="alert">{{ failed }}</p>
       <footer>
@@ -65,8 +79,12 @@ h2 {
 }
 label {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 120px 1fr;
   align-items: center;
+  gap: 8px;
+}
+.check {
+  display: flex;
   gap: 8px;
 }
 .hint {

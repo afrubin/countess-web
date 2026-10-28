@@ -1,8 +1,16 @@
 import type { paths } from './api-schema'
-import type { NodeUpdate, ParameterChange, ResponseOf } from './types'
+import type { NodeUpdate, ParameterChange, ResponseOf, WorkflowUpdate } from './types'
 import { forgetToken, token } from './token'
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  /** The response's HTTP status, if there was a response. */
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message)
+  }
+}
 
 /** Raised when the server refuses the token: the page needs the address with the current one. */
 export class NotAuthorisedError extends ApiError {}
@@ -43,7 +51,7 @@ async function call<P extends keyof paths, M extends Method & keyof paths[P]>(
     throw new NotAuthorisedError('This page is not authorised: open CountESS with the address it printed.')
   }
   if (!response.ok) {
-    throw new ApiError(await errorDetail(response))
+    throw new ApiError(await errorDetail(response), response.status)
   }
   return (await response.json()) as ResponseOf<P, M>
 }
@@ -75,8 +83,7 @@ export const api = {
   loadConfig: (path: string) => call('post', '/api/config/load', '/api/config/load', { path }),
   saveConfig: (path?: string) => call('post', '/api/config/save', '/api/config/save', { path }),
   tidy: () => call('post', '/api/graph/tidy', '/api/graph/tidy'),
-  setWorkflow: (name: string, version: string) =>
-    call('patch', '/api/workflow', '/api/workflow', { name, version }),
+  setWorkflow: (workflow: WorkflowUpdate) => call('patch', '/api/workflow', '/api/workflow', workflow),
 
   addNode: (position: [number, number], plugin?: string) =>
     call('post', '/api/nodes', '/api/nodes', { position, plugin }),
@@ -104,8 +111,8 @@ export const api = {
   runOutputLink: (index: number) =>
     call('post', '/api/run/outputs/{index}/download', `/api/run/outputs/${index}/download`),
   runLogLink: () => call('post', '/api/run/log/download', '/api/run/log/download'),
-  previewLink: (nodeId: string) =>
-    call('post', '/api/nodes/{node_id}/preview/download', `/api/nodes/${id(nodeId)}/preview/download`),
+  savePreview: (nodeId: string, overwrite: boolean) =>
+    call('post', '/api/nodes/{node_id}/preview/save', `/api/nodes/${id(nodeId)}/preview/save`, { overwrite }),
 
   files: (path: string | null, patterns: string[]) =>
     call('get', '/api/files', `/api/files?${query({ path, patterns: patterns.join(',') })}`),

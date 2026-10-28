@@ -27,13 +27,6 @@ class FileType(Model):
     patterns: list[str]
 
 
-class FilenameField(Model):
-    """A field a save path template can use (countess.core.workflow.FILENAME_FIELDS)."""
-
-    name: str
-    description: str
-
-
 class ParamBase(Model):
     """What every BaseParam has. ``path`` is the parameter's key in a pipeline's .ini file."""
 
@@ -134,14 +127,14 @@ class FileParamModel(ParamBase):
 
 
 class SaveFileParamModel(ParamBase):
-    """FileSaveParam: a file to write, possibly a template naming it from the run. ``filled`` is the
-    file it names for a run starting now, or ``templateError`` why it names none."""
+    """FileSaveParam: a file to write. ``inOutputDir`` is a relative OutputFileParam (CSV Save's
+    filename), which each run writes in its own output directory; otherwise ``absolute`` is the file,
+    resolved against the pipeline's folder."""
 
     kind: Literal["save-file"]
     value: Optional[str]
-    filled: Optional[str]
-    templateError: Optional[str]
-    fields: list[FilenameField]
+    absolute: Optional[str]
+    inOutputDir: bool
     fileTypes: list[FileType]
 
 
@@ -249,10 +242,14 @@ class Node(Model):
 
 
 class Workflow(Model):
-    """countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset."""
+    """countess.core.workflow.WorkflowInfo: a short name and a semantic version, either unset; the
+    output directory template each run's files go in; and whether CSV files start with a metadata
+    header."""
 
     name: Optional[str]
     version: Optional[str]
+    outputDir: str
+    metadataHeader: bool
 
 
 class Graph(Model):
@@ -286,10 +283,13 @@ class Edge(Model):
 
 
 class WorkflowUpdate(Model):
-    """An empty string unsets the name or version."""
+    """The whole workflow, replacing what it was. An empty string or null unsets the name or version,
+    and makes the output directory the default."""
 
     name: Optional[str] = None
     version: Optional[str] = None
+    outputDir: Optional[str] = None
+    metadataHeader: bool = True
 
 
 class ConfigPath(Model):
@@ -327,16 +327,23 @@ class Preview(Model):
     total: int
 
 
-class PreviewDownload(Model):
-    sort: Optional[str] = None
-    descending: bool = False
+class PreviewSave(Model):
+    """Save Preview CSV; a file already there is replaced only if ``overwrite``."""
+
+    overwrite: bool = False
+
+
+class SavedPreview(Model):
+    """Where a preview was saved, on the server, and a link that downloads it once within a minute."""
+
+    path: str
+    url: str
 
 
 class DownloadLink(Model):
-    """A link that downloads one file, once, within a minute. ``rows`` is a preview's row count."""
+    """A link that downloads one file, once, within a minute."""
 
     url: str
-    rows: Optional[int] = None
 
 
 # ---- runs ---------------------------------------------------------------------------------------

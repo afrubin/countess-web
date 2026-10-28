@@ -26,7 +26,7 @@ interface State {
 
 const initial: State = {
   // Version -1 is no graph yet: the first state event fetches the real one.
-  graph: { version: -1, workflow: { name: null, version: null }, config: null, modified: false, nodes: [] },
+  graph: { version: -1, workflow: { name: null, version: null, outputDir: '', metadataHeader: true }, config: null, modified: false, nodes: [] },
   plugins: [],
   selectedId: null,
   logs: [],

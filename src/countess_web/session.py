@@ -27,11 +27,12 @@ from collections.abc import Iterator
 from typing import Any, Optional
 
 import duckdb
-from countess.core.config import read_config, write_config
+from countess.core.config import graph_to_config, read_config, write_config
+from countess.core.output import preview_order, save_preview_csv
 from countess.core.parameters import set_file_base_dirs
 from countess.core.pipeline import PipelineGraph, PipelineNode, PipelineNodeStatus
 from countess.core.plugins import BasePlugin
-from countess.core.workflow import RunContext, WorkflowError, WorkflowInfo, default_filename
+from countess.core.workflow import WorkflowError, WorkflowInfo
 from countess.utils.duckdb import duckdb_escape_identifier
 
 from countess_web import models
@@ -63,8 +64,6 @@ class RunState:
     config: str
     started: str
     started_at: float
-    # The workflow as it was when the run started, and the time its output names are made from.
-    context: RunContext
     process: subprocess.Popen
     lines: collections.deque
     # Every line the run printed; ``lines`` keeps only the latest.
@@ -125,9 +124,15 @@ class Session:
         self.run: Optional[RunState] = None
         self.logs = LogBuffer()
         self.state_dir = pathlib.Path(tempfile.mkdtemp(prefix="countess-web-"))
-        self.graph = self._new_graph(PipelineGraph())
+        self.graph = self._new_graph(self._empty_graph())
 
     # ---- the graph as a whole -------------------------------------------------------------------
+
+    def _empty_graph(self) -> PipelineGraph:
+        graph = PipelineGraph()
+        # A new pipeline's relative output directory is in the folder it would be saved in.
+        graph.base_dir = str(self.browse_dir())
+        return graph
 
     def _new_graph(self, graph: PipelineGraph) -> PipelineGraph:
         graph.preview_row_limit = self.preview_row_limit
@@ -153,8 +158,8 @@ class Session:
 
     def new(self) -> None:
         with self.lock:
-            self._replace_graph(PipelineGraph())
             self.config_path = None
+            self._replace_graph(self._empty_graph())
             self.modified = False
 
     def load(self, path: str) -> None:
@@ -186,14 +191,17 @@ class Session:
             logger.info("Saved %s", target)
             return target
 
-    def set_workflow(self, name: Optional[str], version: Optional[str]) -> None:
-        """Sets the workflow's name and version; an empty string unsets one.
+    def set_workflow(
+        self, name: Optional[str], version: Optional[str], output_dir: Optional[str], metadata_header: bool
+    ) -> None:
+        """Sets the workflow's name, version, output directory and metadata header setting; an empty
+        name or version unsets it, and an empty output directory is the default.
 
         Raises:
-            SessionError: If the name or version cannot be used.
+            SessionError: If one cannot be used.
         """
         try:
-            workflow = WorkflowInfo.from_strings(name, version)
+            workflow = WorkflowInfo.from_strings(name, version, output_dir, metadata_header)
         except WorkflowError as exc:
             raise SessionError(str(exc)) from exc
         with self.change(recalculate=False):
@@ -346,7 +354,12 @@ class Session:
         with self.lock:
             return models.Graph(
                 version=self.version,
-                workflow=models.Workflow(name=self.graph.workflow.name, version=self.graph.workflow.version),
+                workflow=models.Workflow(
+                    name=self.graph.workflow.name,
+                    version=self.graph.workflow.version,
+                    outputDir=self.graph.workflow.output_dir,
+                    metadataHeader=self.graph.workflow.metadata_header,
+                ),
                 config=str(self.config_path) if self.config_path else None,
                 modified=self.modified,
                 nodes=[self.describe_node(node) for node in self.graph.nodes],
@@ -394,9 +407,7 @@ class Session:
 
     def describe_parameters(self, node_id: str) -> list[models.Param]:
         with self.lock:
-            node = self.node(node_id)
-            context = RunContext(self.graph.workflow, node.name, datetime.datetime.now())
-            return params.describe_plugin(self.plugin_of(node), context)
+            return params.describe_plugin(self.plugin_of(self.node(node_id)))
 
     def preview(self, node_id: str, offset: int, limit: int) -> models.Preview:
         """Rows ``offset`` on of a node's preview, in the node's own sort order."""
@@ -420,7 +431,7 @@ class Session:
                     for c in columns
                 )
             )
-            if order := sort_order(table.columns, node):
+            if order := preview_order(table.columns, node.sort_column, node.sort_descending):
                 shown = shown.order(order)
             [(total,)] = cursor.table(node.table_name).count("*").fetchall()
             rows = shown.limit(max(0, min(limit, MAX_PREVIEW_ROWS)), max(0, offset)).fetchall()
@@ -445,20 +456,31 @@ class Session:
             for node in self.graph.nodes:
                 if node.plugin:
                     node.load_config()
-            # Whole seconds: the run is told this start, and fills its file names from it as these are.
+            # Whole seconds: the run is told this start, and fills its output directory from it as
+            # these are.
             started = datetime.datetime.now().replace(microsecond=0)
             outputs = [
                 {"node": node.name, "parameter": path, "file": file, "error": error}
                 for node in self.graph.nodes
                 if node.plugin
-                for path, file, error in params.output_files(
-                    node.plugin, RunContext(self.graph.workflow, node.name, started)
-                )
+                for path, file, error in params.output_files(node.plugin, self.graph.context_for(node, started))
             ]
             started_at = started.timestamp()
-            write_config(self.graph, str(snapshot))
+            # Not write_config, which would move the graph's output directory to the snapshot's folder.
+            with open(snapshot, "w", encoding="utf-8") as fh:
+                graph_to_config(self.graph, str(self.state_dir)).write(fh)
+            base_dir = os.path.abspath(self.graph.base_dir)
             process = subprocess.Popen(  # pylint: disable=consider-using-with
-                [sys.executable, "-m", "countess_web.runner", "--started", started.isoformat(), str(snapshot)],
+                [
+                    sys.executable,
+                    "-m",
+                    "countess_web.runner",
+                    "--started",
+                    started.isoformat(),
+                    "--base-dir",
+                    base_dir,
+                    str(snapshot),
+                ],
                 cwd=str(self.config_path.parent if self.config_path else self.start_dir),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -470,7 +492,6 @@ class Session:
                 config=str(self.config_path or snapshot),
                 started=started.isoformat(),
                 started_at=started_at,
-                context=RunContext(self.graph.workflow, "run", started),
                 process=process,
                 lines=collections.deque(maxlen=5000),
                 log_file=self.state_dir / f"run-{run_id}.log",
@@ -543,33 +564,29 @@ class Session:
         """
         if not self.run:
             raise SessionError("Nothing has been run")
-        return self.run.log_file, default_filename(self.run.context, "log", "txt")
+        return self.run.log_file, "run-log.txt"
 
-    def export_preview(self, node_id: str) -> tuple[pathlib.Path, str, int]:
-        """Writes a node's whole preview table, in its sort order, to a CSV file: the file, a name
-        for it, and its rows.
+    def save_preview(self, node_id: str, overwrite: bool = False) -> pathlib.Path:
+        """Saves a node's whole preview table, in its sort order, as CountESS's GUI does: to
+        ``<node-name>_preview.csv`` in the output directory for this session.
 
         Raises:
-            SessionError: If the node has no preview table.
+            FileExistsError: If that file is there and ``overwrite`` is not set.
+            SessionError: If the node has no preview table, or the file cannot be written.
         """
         node = self.node(node_id)
         if node.status != PipelineNodeStatus.RESULT:
-            raise SessionError(f"{node.name} has no preview to download")
-        target = self.state_dir / f"preview-{uuid_mod.uuid4().hex}.csv"
+            raise SessionError(f"{node.name} has no preview to save")
         try:
-            cursor = self.graph.ddbc.cursor()
-            try:
-                table = cursor.table(node.table_name)
-                if order := sort_order(table.columns, node):
-                    table = table.order(order)
-                [(rows,)] = cursor.table(node.table_name).count("*").fetchall()
-                table.write_csv(str(target), header=True)
-            finally:
-                cursor.close()
+            path = save_preview_csv(self.graph, node, overwrite=overwrite)
+        except FileExistsError:
+            raise
         except (duckdb.CatalogException, duckdb.ConnectionException) as exc:
             raise SessionError(f"{node.name}'s preview changed; try again once it has finished") from exc
-        name = default_filename(RunContext(self.graph.workflow, node.name, datetime.datetime.now()), "preview", "csv")
-        return target, name, rows
+        except (OSError, ValueError) as exc:
+            raise SessionError(f"Could not save {node.name}'s preview: {exc}") from exc
+        logger.info("Saved %s's preview to %s", node.name, path)
+        return pathlib.Path(path)
 
     def stop_run(self) -> None:
         with self.lock:
@@ -629,7 +646,7 @@ def preview_thread(graph: PipelineGraph) -> None:
     graph.thread_cursor = graph.ddbc.cursor()
     graph.thread_cursor.sql("set enable_progress_bar=true")
     graph.thread_cursor.sql("set enable_progress_bar_print=false")
-    graph.set_contexts(datetime.datetime.now())
+    graph.set_contexts(graph.session_started)
     try:
         for node in graph.traverse_nodes():
             if graph.thread_stop:
@@ -668,15 +685,3 @@ def valid_position(position: tuple[float, float]) -> tuple[float, float]:
         raise SessionError("A node position must be two finite numbers")
     x, y = position
     return (min(max(float(x), 0.0), 1.0), min(max(float(y), 0.0), 1.0))
-
-
-def sort_order(columns: list[str], node: PipelineNode) -> Optional[str]:
-    """The ORDER BY of a node's preview, as CountESS's GUI sorts it: by column number
-    ``node.sort_column`` (ascending unless ``sort_descending``), then by every other column, so
-    that rows the column ties on keep a stable order."""
-    if not columns:
-        return None
-    key = columns[node.sort_column] if node.sort_column < len(columns) else columns[0]
-    direction = "DESC" if node.sort_descending else "ASC"
-    rest = ", ".join(duckdb_escape_identifier(c) for c in columns if c != key)
-    return f"{duckdb_escape_identifier(key)} {direction} NULLS LAST" + (f", {rest}" if rest else "")

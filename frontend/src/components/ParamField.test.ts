@@ -22,13 +22,9 @@ function saveFile(overrides: Partial<ParamOf<'save-file'>> = {}): ParamOf<'save-
     kind: 'save-file',
     path: 'filename',
     label: 'Filename',
-    value: '{date}_{node}.csv',
-    filled: '/data/run1/2026-10-21_save.csv',
-    templateError: null,
-    fields: [
-      { name: 'date', description: 'the date of the run' },
-      { name: 'node', description: 'the node' },
-    ],
+    value: 'results.csv',
+    absolute: null,
+    inOutputDir: true,
     fileTypes: [],
     ...overrides,
   }
@@ -170,16 +166,19 @@ describe('ParamField', () => {
     expect(wrapper.find('input').exists()).toBe(false)
   })
 
-  it('keeps a save path template when only its folder is chosen', async () => {
-    const { wrapper, actions } = mountField(saveFile(), ['/data/run2/2026-10-21_save.csv'])
+  it("says a relative output file is written in each run's output directory", () => {
+    const { wrapper } = mountField(saveFile())
 
-    await wrapper.find('button').trigger('click')
-    await settle()
-
-    expect(actions.change).toHaveBeenCalledWith({ path: 'filename', value: '/data/run2/{date}_{node}.csv' })
+    expect(wrapper.find('.save-where').text()).toBe("in each run's output directory")
   })
 
-  it('takes a save path typed as a new name', async () => {
+  it('shows where an absolute save path writes', () => {
+    const { wrapper } = mountField(saveFile({ value: '/data/final.csv', absolute: '/data/final.csv', inOutputDir: false }))
+
+    expect(wrapper.find('.save-where').text()).toContain('final.csv in /data')
+  })
+
+  it('takes a save path chosen in the file browser', async () => {
     const { wrapper, actions } = mountField(saveFile(), ['/data/run2/final.csv'])
 
     await wrapper.find('button').trigger('click')

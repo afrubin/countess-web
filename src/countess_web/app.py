@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import fnmatch
-import os
 import pathlib
 import secrets
 import threading
@@ -27,7 +26,6 @@ import fastapi.openapi.utils
 import fastapi.responses
 import fastapi.staticfiles
 import pydantic
-import starlette.background
 import starlette.requests
 
 from countess_web import VERSION
@@ -50,8 +48,6 @@ class Download:
     file: pathlib.Path
     filename: str
     expires: float
-    # A file made for this download (a preview's CSV), removed once sent or expired.
-    temporary: bool
 
 
 class Downloads:
@@ -65,11 +61,11 @@ class Downloads:
         self.lock = threading.Lock()
         self.links: dict[str, Download] = {}
 
-    def issue(self, file: pathlib.Path, filename: str, temporary: bool = False) -> str:
+    def issue(self, file: pathlib.Path, filename: str) -> str:
         key = secrets.token_urlsafe(24)
         with self.lock:
             self._expire()
-            self.links[key] = Download(file, filename, time.monotonic() + DOWNLOAD_LINK_SECONDS, temporary)
+            self.links[key] = Download(file, filename, time.monotonic() + DOWNLOAD_LINK_SECONDS)
         return f"{DOWNLOAD_PREFIX.lstrip('/')}{key}"
 
     def take(self, key: str) -> Optional[Download]:
@@ -82,15 +78,6 @@ class Downloads:
         for key, download in list(self.links.items()):
             if download.expires < now:
                 del self.links[key]
-                if download.temporary:
-                    remove(download.file)
-
-
-def remove(file: pathlib.Path) -> None:
-    try:
-        os.remove(file)
-    except FileNotFoundError:
-        pass
 
 
 def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disable=too-many-locals,too-many-statements
@@ -168,7 +155,7 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
 
     @app.patch("/api/workflow")
     def workflow(body: models.WorkflowUpdate) -> models.Graph:
-        session.set_workflow(body.name, body.version)
+        session.set_workflow(body.name, body.version, body.outputDir, body.metadataHeader)
         return session.describe_graph()
 
     @app.post("/api/graph/tidy")
@@ -256,10 +243,13 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
         file, filename = session.run_log()
         return models.DownloadLink(url=downloads.issue(file, filename))
 
-    @app.post("/api/nodes/{node_id}/preview/download")
-    def preview_download(node_id: str) -> models.DownloadLink:
-        file, filename, rows = session.export_preview(node_id)
-        return models.DownloadLink(url=downloads.issue(file, filename, temporary=True), rows=rows)
+    @app.post("/api/nodes/{node_id}/preview/save", responses={409: {"description": "The file is already there"}})
+    def preview_save(node_id: str, body: models.PreviewSave) -> models.SavedPreview:
+        try:
+            file = session.save_preview(node_id, overwrite=body.overwrite)
+        except FileExistsError as exc:
+            raise fastapi.HTTPException(409, f"{exc.args[0]} is already there") from exc
+        return models.SavedPreview(path=str(file), url=downloads.issue(file, file.name))
 
     @app.get(DOWNLOAD_PREFIX + "{key}", include_in_schema=False)
     def download(key: str) -> Any:
@@ -270,8 +260,7 @@ def create_app(session: Session, token: str) -> fastapi.FastAPI:  # pylint: disa
             )
         if not found.file.is_file():
             return fastapi.responses.PlainTextResponse(f"{found.filename} is no longer there.", status_code=404)
-        background = starlette.background.BackgroundTask(remove, found.file) if found.temporary else None
-        return fastapi.responses.FileResponse(found.file, filename=found.filename, background=background)
+        return fastapi.responses.FileResponse(found.file, filename=found.filename)
 
     # ---- files on the server ---------------------------------------------------------------------
 

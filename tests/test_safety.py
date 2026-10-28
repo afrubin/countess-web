@@ -231,7 +231,7 @@ def test_a_loaded_pipeline_has_each_list_parameter_once(session: Session, workdi
     assert len(load_node.plugin.columns) == 2
 
 
-# ---- the workflow's name and version ------------------------------------------------------------
+# ---- the workflow ---------------------------------------------------------------------------------
 
 
 def test_the_workflow_name_and_version_are_saved_with_the_pipeline(
@@ -242,8 +242,35 @@ def test_the_workflow_name_and_version_are_saved_with_the_pipeline(
     graph = client.patch("/api/workflow", json={"name": "FWD test", "version": "1.2.0"}).json()
     client.post("/api/config/save", json={})
 
-    assert graph["workflow"] == {"name": "FWD test", "version": "1.2.0"}
-    assert "[_workflow]\nname = FWD test\nversion = 1.2.0" in (workdir / "pipeline.ini").read_text()
+    assert graph["workflow"] == {
+        "name": "FWD test",
+        "version": "1.2.0",
+        "outputDir": "{date}_{time}_{workflow}_{version}",
+        "metadataHeader": True,
+    }
+    assert "[_workflow]\nname = FWD test\nversion = 1.2.0\n\n" in (workdir / "pipeline.ini").read_text()
+
+
+def test_the_output_directory_and_metadata_header_are_saved_with_the_pipeline(
+    client: fastapi.testclient.TestClient, workdir: pathlib.Path
+) -> None:
+    load(client, workdir)
+
+    client.patch("/api/workflow", json={"outputDir": "results/{date}", "metadataHeader": False})
+    client.post("/api/config/save", json={})
+    reloaded = client.post("/api/config/load", json={"path": str(workdir / "pipeline.ini")}).json()
+
+    assert reloaded["workflow"]["outputDir"] == "results/{date}"
+    assert reloaded["workflow"]["metadataHeader"] is False
+
+
+def test_an_output_directory_with_a_field_it_does_not_have_is_refused(
+    client: fastapi.testclient.TestClient,
+) -> None:
+    response = client.patch("/api/workflow", json={"outputDir": "{node}"})
+
+    assert response.status_code == 400
+    assert "unknown field {node}" in response.json()["detail"]
 
 
 def test_a_version_that_is_not_semantic_is_refused(client: fastapi.testclient.TestClient) -> None:
@@ -253,33 +280,16 @@ def test_a_version_that_is_not_semantic_is_refused(client: fastapi.testclient.Te
     assert "semantic version" in response.json()["detail"]
 
 
-def test_a_save_path_is_described_with_the_file_it_names_now(
+def test_a_new_csv_save_writes_results_csv_in_each_runs_output_directory(
     client: fastapi.testclient.TestClient, workdir: pathlib.Path
 ) -> None:
     load(client, workdir)
-    client.patch("/api/workflow", json={"name": "FWD test", "version": "1.2.0"})
     node = add_plugin_node(client, "countess.plugins.csv:SaveCsvPlugin")
 
     filename = {p["path"]: p for p in client.get(f"/api/nodes/{node}/parameters").json()}["filename"]
 
     assert filename["kind"] == "save-file"
-    assert filename["value"] == "{date}_{workflow}_{version}_{node}.csv"
-    assert filename["filled"].startswith(str(workdir))
-    assert filename["filled"].endswith("_fwd-test_v1-2-0_csv-save.csv")
-    assert "node" in [field["name"] for field in filename["fields"]]
-
-
-def test_a_save_path_template_that_cannot_be_filled_says_why(
-    client: fastapi.testclient.TestClient, workdir: pathlib.Path
-) -> None:
-    load(client, workdir)
-    node = add_plugin_node(client, "countess.plugins.csv:SaveCsvPlugin")
-
-    described = client.post(f"/api/nodes/{node}/parameters", json={"path": "filename", "value": "{nope}.csv"}).json()
-
-    filename = {p["path"]: p for p in described}["filename"]
-    assert filename["filled"] is None
-    assert "unknown field {nope}" in filename["templateError"]
+    assert (filename["value"], filename["inOutputDir"], filename["absolute"]) == ("results.csv", True, None)
 
 
 def test_an_integer_a_browser_cannot_hold_exactly_is_previewed_as_text(
